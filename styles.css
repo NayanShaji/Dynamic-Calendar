@@ -1,6 +1,7 @@
 * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; transition: background-color 0.3s, color 0.3s; }
 
-body { display: flex; height: 100vh; overflow: hidden; background-color: #f9f9f9; }
+/* CRITICAL FIX: 100dvh makes the app aware of mobile browser search/nav bars! */
+body { display: flex; height: 100vh; height: 100dvh; overflow: hidden; background-color: #f9f9f9; }
 
 .hidden { display: none !important; }
 
@@ -94,7 +95,6 @@ body { display: flex; height: 100vh; overflow: hidden; background-color: #f9f9f9
 .weekdays { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-weight: bold; margin-bottom: 5px; color: #555; flex-shrink: 0; }
 #calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); grid-template-rows: repeat(6, 1fr); gap: 5px; flex-grow: 1; min-height: 0; overflow: hidden; }
 
-/* CRITICAL UPDATE: strict overflow rules to completely eliminate scrollbar */
 .day-cell { background: #fff; border: 1px solid #ddd; border-radius: 4px; padding: 4px 6px; display: flex; flex-direction: column; overflow: hidden; transition: background-color 0.2s, border-color 0.2s; position: relative; cursor: pointer; min-height: 0; }
 .day-content { flex-grow: 1; overflow: hidden; display: flex; flex-direction: column; gap: 3px; min-height: 0; }
 
@@ -111,7 +111,6 @@ body { display: flex; height: 100vh; overflow: hidden; background-color: #f9f9f9
 .add-event-btn:hover { background: rgba(0,0,0,0.1); color: #333; }
 .day-cell:hover .add-event-btn { opacity: 1; }
 
-/* The +1 More Indicator is safely outside the overflow box */
 .more-indicator { font-size: 0.75rem; color: #555; text-align: center; margin-top: auto; padding-top: 2px; font-weight: 600; cursor: pointer; flex-shrink: 0; transition: color 0.2s, text-shadow 0.2s; }
 .more-indicator:hover { text-decoration: underline; }
 
@@ -208,7 +207,6 @@ body.dark-mode .more-indicator { color: #aaa; }
 
 body.dark-mode .today-highlight { border-color: #3498db !important; background-color: rgba(52, 152, 219, 0.05); }
 
-/* Remove default dark-mode text shadows unless dynamically added by JS */
 body.dark-mode .calendar-task { background: rgba(30, 30, 30, 0.9); border-color: #444; color: #e0e0e0; }
 body.dark-mode .calendar-event { color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
 body.dark-mode .add-event-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
@@ -243,7 +241,8 @@ body.dark-mode .custom-color-btn:hover { background: #444; }
     .nav-text { display: none; }
     .header-select { font-size: 1rem; padding: 4px 8px; }
     
-    #calendar-view { padding: 10px; }
+    /* ADDED EXTRA BOTTOM PADDING */
+    #calendar-view { padding: 10px 10px 15px 10px; }
     
     .weekdays div { font-size: 0.7rem; }
     #calendar-grid { gap: 2px; grid-auto-rows: minmax(60px, 1fr); }
