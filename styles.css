@@ -2,24 +2,33 @@
 
 body { display: flex; height: 100vh; overflow: hidden; background-color: #f9f9f9; }
 
-/* Global Hidden Class Fix */
 .hidden { display: none !important; }
 
 /* Fixed Sidebar */
 #sidebar { width: 340px; background: #ffffff; border-right: 1px solid #ddd; display: flex; flex-direction: column; flex-shrink: 0; z-index: 10; }
 
-/* --- BRANDING SECTION --- */
 .app-branding { padding: 20px 20px 0 20px; border-bottom: 1px solid #eee; padding-bottom: 15px; background-color: #fafafa; }
 .app-title { font-size: 1.4rem; font-weight: 800; color: #2c3e50; margin-bottom: 4px; letter-spacing: -0.5px; }
 .app-subtitle { font-size: 0.85rem; color: #555; margin-bottom: 8px; font-weight: 500; }
 .app-credits { font-size: 0.75rem; color: #888; font-style: italic; }
 
-/* Sidebar Header */
+.todays-tasks-widget { padding: 15px 20px 15px 20px; border-bottom: 1px solid #eee; background-color: #fff; }
+.widget-title { font-size: 0.95rem; color: #333; font-weight: 700; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+.widget-list { display: flex; flex-direction: column; gap: 6px; max-height: 150px; overflow-y: auto; padding-right: 5px; }
+.widget-empty { color: #888; font-size: 0.85rem; font-style: italic; }
+.widget-task { display: flex; align-items: center; background: #f9f9f9; border: 1px solid #eee; padding: 6px 8px; border-radius: 4px; font-size: 0.85rem; box-shadow: 0 1px 2px rgba(0,0,0,0.02); }
+.widget-task.completed { opacity: 0.5; text-decoration: line-through; }
+.widget-task input[type="checkbox"] { margin-right: 8px; margin-left: 4px; cursor: pointer; }
+.widget-task span.color-dot { width: 10px; height: 10px; display: inline-block; border-radius: 50%; margin-right: 6px; flex-shrink: 0; }
+.widget-task span.task-text { flex-grow: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.overdue-badge { background: #e74c3c; color: white; font-size: 0.6rem; padding: 2px 4px; border-radius: 3px; margin-left: auto; font-weight: bold; text-transform: uppercase; flex-shrink: 0; }
+
 .sidebar-header { display: flex; justify-content: space-between; align-items: center; padding: 15px 20px 10px 20px; }
 .sidebar-header h2 { font-size: 1.2rem; color: #333; font-weight: 600; }
 .header-actions { display: flex; gap: 8px; }
 
-.icon-btn { width: 30px; height: 30px; border: none; border-radius: 4px; display: flex; justify-content: center; align-items: center; cursor: pointer; transition: opacity 0.2s; }
+.icon-btn { width: 30px; height: 30px; border: none; border-radius: 4px; display: flex; justify-content: center; align-items: center; cursor: pointer; transition: opacity 0.2s; background-color: #eee; color: #333; }
 .icon-btn:hover { opacity: 0.8; }
 .icon-btn svg { width: 16px; height: 16px; }
 
@@ -31,37 +40,36 @@ body { display: flex; height: 100vh; overflow: hidden; background-color: #f9f9f9
 #sidebar-content { padding: 10px 20px; overflow-y: auto; flex-grow: 1; }
 #sidebar-content.drag-over { background-color: #f0f8ff; transition: background-color 0.2s; }
 
-/* Inline List Styling */
 .type-group { margin-bottom: 15px; }
 .flex-row { display: flex; align-items: center; padding: 4px 0; }
 
 .drag-handle { color: #aaa; font-size: 14px; margin-right: 8px; cursor: grab; user-select: none; letter-spacing: -2px; }
 .drag-handle:active { cursor: grabbing; }
 
-/* Collapse Toggle & Progress Bar */
 .collapse-toggle { font-size: 10px; color: #888; cursor: pointer; margin-right: 8px; transition: transform 0.2s ease; user-select: none; width: 12px; text-align: center; }
 .collapse-toggle.collapsed { transform: rotate(-90deg); }
 
 .progress-bar-container { height: 4px; background-color: #eee; border-radius: 2px; margin: 2px 10px 8px 56px; overflow: hidden; }
 .progress-bar-fill { height: 100%; border-radius: 2px; transition: width 0.4s ease, background-color 0.3s; }
 
-/* Clickable Color Dot */
 .color-picker-container { position: relative; width: 14px; height: 14px; margin-right: 8px; cursor: pointer; flex-shrink: 0; }
 .hidden-color-picker { position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
 .color-dot { width: 100%; height: 100%; border-radius: 50%; border: 1px solid rgba(0,0,0,0.1); pointer-events: none; }
 
-/* Inline Inputs */
 .inline-input { border: none; background: transparent; outline: none; font-size: 0.95rem; color: #333; flex-grow: 1; padding: 4px; }
 .inline-input::placeholder { color: #bbb; }
 .type-input { font-weight: 600; font-size: 1rem; }
 
-/* Tasks (Indented) */
+.delete-task-btn { background: transparent; border: none; color: #e74c3c; font-size: 1.2rem; cursor: pointer; opacity: 0; transition: opacity 0.2s; padding: 0 4px; margin-left: 5px; line-height: 1; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.delete-task-btn:hover { color: #c0392b; }
+.task-item:hover .delete-task-btn { opacity: 1; }
+
 .task-list { padding-left: 22px; margin-top: 4px; }
+.task-list.hidden { display: none; }
 .task-item { border-radius: 4px; }
 .task-item:hover { background-color: #f5f5f5; }
 .task-checkbox { margin-right: 8px; cursor: pointer; width: 14px; height: 14px; flex-shrink: 0; }
 
-/* Subtasks Styling */
 .subtask-list { padding-left: 28px; border-left: 2px solid #eee; margin-left: 14px; margin-bottom: 6px; }
 .subtask-item .inline-input { font-size: 0.85rem; color: #555; }
 .subtask-item .drag-handle { visibility: hidden; width: 14px; } 
@@ -77,27 +85,34 @@ body { display: flex; height: 100vh; overflow: hidden; background-color: #f9f9f9
 /* Calendar View */
 #calendar-view { flex-grow: 1; display: flex; flex-direction: column; padding: 20px; width: 100%; }
 .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
-.calendar-header button { width: auto; padding: 8px 15px; background: #2c3e50; color: white; border: none; border-radius: 4px; cursor: pointer; }
+.calendar-dropdowns { display: flex; gap: 10px; align-items: center; }
+.header-select { font-size: 1.2rem; font-weight: 700; color: #2c3e50; border: 1px solid #ddd; padding: 6px 12px; border-radius: 4px; background-color: #fff; cursor: pointer; outline: none; }
+
+/* Wrapper for Axes Flipping */
+.calendar-wrapper { display: flex; flex-direction: column; flex-grow: 1; min-height: 0; }
+.short-day { display: none; }
+.full-day { display: inline; }
 
 .weekdays { display: grid; grid-template-columns: repeat(7, 1fr); text-align: center; font-weight: bold; margin-bottom: 5px; color: #555; }
-#calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: minmax(100px, 1fr); gap: 5px; flex-grow: 1; }
+#calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); grid-auto-rows: minmax(100px, 1fr); gap: 5px; flex-grow: 1; overflow-y: auto; }
 
-.day-cell { background: #fff; border: 1px solid #ddd; border-radius: 4px; padding: 5px; display: flex; flex-direction: column; overflow-y: auto; transition: background-color 0.2s, border-color 0.2s; position: relative; }
-.empty-day { background: #f9f9f9; border: none; }
+.day-cell { background: #fff; border: 1px solid #ddd; border-radius: 4px; padding: 5px; display: flex; flex-direction: column; overflow-y: auto; transition: background-color 0.2s, border-color 0.2s; position: relative; cursor: pointer; }
+.dimmed-day { background-color: #f5f5f5 !important; }
+.dimmed-day .day-number { color: #ccc; }
 .day-cell.drag-over { background: #e8f4fd !important; border: 2px dashed #3498db; }
 
-/* Today Highlight */
 .today-highlight { border: 2px solid #3498db !important; background-color: #f4faff; }
 .today-highlight .day-number { color: #3498db; font-weight: 800; background-color: #e8f4fd; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; }
 
-/* Calendar Headers & Event Buttons */
 .day-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
 .day-number { font-weight: bold; font-size: 0.9rem; color: #888; }
 .add-event-btn { opacity: 0; background: transparent; border: none; color: #888; font-size: 1.2rem; cursor: pointer; border-radius: 4px; line-height: 1; padding: 0 4px; transition: opacity 0.2s; }
 .add-event-btn:hover { background: rgba(0,0,0,0.1); color: #333; }
 .day-cell:hover .add-event-btn { opacity: 1; }
 
-/* In-Calendar Events & Tasks */
+.more-indicator { font-size: 0.75rem; color: #555; text-align: center; margin-top: 4px; font-weight: 600; cursor: pointer; }
+.more-indicator:hover { color: #333; text-decoration: underline; }
+
 .calendar-event { font-weight: bold; text-decoration: underline; font-size: 0.85rem; color: #111; margin-bottom: 6px; padding: 2px 4px; cursor: pointer; text-align: center; border-radius: 3px; }
 .calendar-event:hover { background: rgba(0,0,0,0.05); }
 
@@ -106,17 +121,29 @@ body { display: flex; height: 100vh; overflow: hidden; background-color: #f9f9f9
 .calendar-task.completed { opacity: 0.5; text-decoration: line-through; }
 .calendar-task input[type="checkbox"] { margin-right: 6px; margin-left: 4px; }
 
-/* Modal Styles */
 .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); display: flex; justify-content: center; align-items: center; z-index: 100; }
 .modal-content { background: white; padding: 20px; border-radius: 8px; width: 320px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
 .modal-content h3 { margin-bottom: 15px; color: #333; }
 .modal-content input[type="text"] { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; }
 
-/* Dropdown and Form Groups */
+.day-view-content { width: 400px; max-height: 80vh; overflow-y: auto; }
+.day-view-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+.day-view-header h3 { margin-bottom: 0; color: #2c3e50; }
+#close-day-view-btn { background: none; border: none; font-size: 1.5rem; color: #aaa; cursor: pointer; height: auto; width: auto; }
+#close-day-view-btn:hover { color: #e74c3c; }
+.day-view-section { margin-bottom: 15px; }
+
 .modal-form-group { margin-bottom: 15px; }
 .modal-form-group label { display: block; margin-bottom: 5px; color: #555; font-size: 0.9rem; }
 .modal-content select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 1rem; background: #fff; cursor: pointer; }
 #custom-type-fields { background: #f9f9f9; padding: 12px; border-radius: 4px; border: 1px dashed #ccc; margin-bottom: 15px; }
+
+.modal-desc { font-size: 0.9rem; color: #555; margin-bottom: 15px; }
+.overdue-list { max-height: 200px; margin-bottom: 15px; border: 1px solid #eee; padding: 10px; border-radius: 4px; }
+.do-not-ask-group { display: flex; align-items: center; }
+.do-not-ask-group input { margin-right: 8px; cursor: pointer; }
+.do-not-ask-group label { font-size: 0.85rem; color: #555; cursor: pointer; }
+#shift-overdue-btn { background: #2c3e50; color: white; border: none; padding: 8px 15px; border-radius: 4px; cursor: pointer; font-weight: 500; }
 
 .color-picker-group { display: flex; align-items: center; margin-bottom: 10px; }
 .color-picker-group label { margin-right: 10px; color: #555; }
@@ -139,16 +166,100 @@ body.dark-mode .inline-input { color: #e0e0e0; }
 body.dark-mode .task-item:hover { background-color: #2a2a2a; }
 body.dark-mode #sidebar-content.drag-over { background-color: #2c3e50; }
 
+body.dark-mode .icon-btn { background-color: #333; color: #e0e0e0; }
+body.dark-mode .theme-btn { background-color: #34495e; color: white; }
+body.dark-mode .export-btn { background-color: #27ae60; color: white; }
+body.dark-mode .import-btn { background-color: #f39c12; color: white; }
+body.dark-mode .ics-btn { background-color: #4285F4; color: white; }
+
+body.dark-mode .todays-tasks-widget { background-color: #1e1e1e; border-bottom-color: #333; }
+body.dark-mode .widget-title { color: #e0e0e0; }
+body.dark-mode .widget-task { background: rgba(30, 30, 30, 0.9); border-color: #444; color: #e0e0e0; }
+body.dark-mode .widget-empty { color: #aaa; }
+body.dark-mode .overdue-list { border-color: #444; }
+body.dark-mode .modal-desc, body.dark-mode .do-not-ask-group label { color: #aaa; }
+
 body.dark-mode .collapse-toggle { color: #aaa; }
 body.dark-mode .progress-bar-container { background-color: #333; }
 body.dark-mode .subtask-list { border-left-color: #444; }
 body.dark-mode .subtask-item .inline-input { color: #bbb; }
+body.dark-mode .delete-task-btn { color: #ff6b6b; } 
 
 body.dark-mode .calendar-header { color: #e0e0e0; }
+body.dark-mode .header-select { background-color: #2a2a2a; color: #e0e0e0; border-color: #444; }
 body.dark-mode .weekdays { color: #aaa; }
+
 body.dark-mode .day-cell { background: #1e1e1e; border-color: #333; }
-body.dark-mode .empty-day { background: #121212; }
+body.dark-mode .dimmed-day { background-color: #151515 !important; }
+body.dark-mode .dimmed-day .day-number { color: #555; }
 body.dark-mode .day-cell.drag-over { background: #2c3e50 !important; border-color: #3498db; }
+body.dark-mode .more-indicator { color: #aaa; }
+body.dark-mode .more-indicator:hover { color: #fff; }
 
 body.dark-mode .today-highlight { border-color: #3498db !important; background-color: rgba(52, 152, 219, 0.05); }
-body.dark-mode .today-highlight
+body.dark-mode .today-highlight .day-number { background-color: #3498db; color: #fff; }
+
+body.dark-mode .calendar-task { background: rgba(30, 30, 30, 0.9); border-color: #444; color: #e0e0e0; }
+body.dark-mode .calendar-event { color: #fff; text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
+body.dark-mode .add-event-btn:hover { background: rgba(255,255,255,0.1); color: #fff; }
+
+body.dark-mode .modal-content { background: #1e1e1e; color: #e0e0e0; }
+body.dark-mode .modal-content h3 { color: #fff; }
+body.dark-mode .modal-content input[type="text"], body.dark-mode .modal-content select { background: #2a2a2a; border-color: #444; color: #fff; }
+body.dark-mode .modal-form-group label { color: #aaa; }
+body.dark-mode #custom-type-fields { background: #222; border-color: #444; }
+body.dark-mode .secondary-btn { background: #444; color: #e0e0e0; }
+body.dark-mode .day-view-header { border-bottom-color: #333; }
+
+/* --- MOBILE RESPONSIVENESS (Desktops > 768px are completely unaffected) --- */
+.hidden-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 5; display: none; opacity: 0; transition: opacity 0.3s; }
+.hidden-overlay.active { display: block; opacity: 1; }
+
+@media (max-width: 768px) {
+    #sidebar { position: fixed; top: 0; left: -100%; height: 100%; z-index: 10; transition: left 0.3s ease; box-shadow: 2px 0 15px rgba(0,0,0,0.3); width: 85%; max-width: 340px; }
+    #sidebar.open { left: 0; }
+    
+    #mobile-menu-btn { display: flex !important; order: 1; margin-right: auto; }
+    
+    .calendar-header { display: flex; flex-wrap: nowrap; justify-content: space-between; align-items: center; gap: 5px; overflow-x: auto; padding-bottom: 5px; }
+    .calendar-dropdowns { order: 2; margin-top: 0; width: auto; justify-content: center; }
+    
+    #prev-week { order: 3; padding: 0 8px !important; }
+    #next-week { order: 4; padding: 0 8px !important; }
+    .nav-text { display: none; }
+    .header-select { font-size: 1rem; padding: 4px 8px; }
+    
+    #calendar-view { padding: 10px; }
+    
+    .delete-task-btn { opacity: 0.5; }
+    .modal-content { padding: 15px; width: 95%; }
+    .day-view-content { width: 95%; }
+    body.dark-mode #mobile-menu-btn { background: #34495e !important; }
+}
+
+/* PORTRAIT MODE SPECIFIC (Flipped Axes) */
+@media (max-width: 768px) and (orientation: portrait) {
+    .calendar-wrapper { flex-direction: row; }
+    .full-day { display: none; }
+    .short-day { display: block; font-size: 0.8rem; }
+    
+    .weekdays { display: grid; grid-template-columns: 1fr; grid-template-rows: repeat(7, 1fr); margin-bottom: 0; margin-right: 5px; width: 25px; align-items: center; }
+    
+    #calendar-grid { 
+        grid-template-rows: repeat(7, 1fr) !important; 
+        grid-template-columns: repeat(2, 1fr) !important; 
+        grid-auto-flow: column; 
+        flex-grow: 1; 
+        gap: 2px;
+    }
+    
+    .day-cell { padding: 2px; }
+    .day-header { margin-bottom: 2px; }
+    .day-number { font-size: 0.75rem; }
+    .add-event-btn { font-size: 1rem; padding: 0 2px; opacity: 1; color: #aaa; } 
+    
+    .calendar-task, .calendar-event { font-size: 0.65rem; padding: 2px; margin-bottom: 2px; }
+    .calendar-task input[type="checkbox"] { margin-right: 3px; margin-left: 1px; width: 10px; height: 10px; }
+    .color-dot { width: 8px; height: 8px; }
+    .more-indicator { font-size: 0.6rem; margin-top: 2px; }
+}

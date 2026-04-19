@@ -7,11 +7,18 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+    <div id="mobile-overlay" class="hidden-overlay"></div>
+
     <aside id="sidebar">
         <div class="app-branding">
             <h1 class="app-title">Dynamic Planner</h1>
             <p class="app-subtitle">A drag-and-drop calendar planner</p>
             <p class="app-credits">Made with &hearts; by Nayan Shaji, with help of Gemini AI</p>
+        </div>
+
+        <div id="todays-tasks-widget" class="todays-tasks-widget">
+            <h3 class="widget-title">Today's Tasks</h3>
+            <div id="todays-tasks-list" class="widget-list"></div>
         </div>
 
         <div class="sidebar-header">
@@ -36,24 +43,51 @@
         
         <div id="sidebar-content">
             <div id="task-list-container"></div>
-            <div id="add-type-btn" class="add-btn">+ List item</div>
+            <div id="add-type-btn" class="add-btn">+ List Subject/Category</div>
         </div>
     </aside>
 
     <main id="calendar-view">
         <header class="calendar-header">
-            <button id="prev-month">◀</button>
-            <h1 id="month-year-display"></h1>
-            <button id="next-month">▶</button>
+            <button id="mobile-menu-btn" class="icon-btn" style="display: none; background-color: #2c3e50; color: white; width: 40px; height: 40px; transition: opacity 0.2s, transform 0.2s;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+            </button>
+            
+            <button id="prev-week" class="icon-btn" style="width: auto; padding: 0 15px;">▲ <span class="nav-text">Up</span></button>
+            <div class="calendar-dropdowns">
+                <select id="month-select" class="header-select">
+                    <option value="0">January</option>
+                    <option value="1">February</option>
+                    <option value="2">March</option>
+                    <option value="3">April</option>
+                    <option value="4">May</option>
+                    <option value="5">June</option>
+                    <option value="6">July</option>
+                    <option value="7">August</option>
+                    <option value="8">September</option>
+                    <option value="9">October</option>
+                    <option value="10">November</option>
+                    <option value="11">December</option>
+                </select>
+                <select id="year-select" class="header-select"></select>
+            </div>
+            <button id="next-week" class="icon-btn" style="width: auto; padding: 0 15px;">▼ <span class="nav-text">Down</span></button>
         </header>
         
-        <div class="weekdays">
-            <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div>
-            <div>Thu</div><div>Fri</div><div>Sat</div>
-        </div>
-        
-        <div id="calendar-grid">
+        <div class="calendar-wrapper">
+            <div class="weekdays">
+                <div><span class="full-day">Sun</span><span class="short-day">Su</span></div>
+                <div><span class="full-day">Mon</span><span class="short-day">Mo</span></div>
+                <div><span class="full-day">Tue</span><span class="short-day">Tu</span></div>
+                <div><span class="full-day">Wed</span><span class="short-day">We</span></div>
+                <div><span class="full-day">Thu</span><span class="short-day">Th</span></div>
+                <div><span class="full-day">Fri</span><span class="short-day">Fr</span></div>
+                <div><span class="full-day">Sat</span><span class="short-day">Sa</span></div>
             </div>
+            
+            <div id="calendar-grid">
+                </div>
+        </div>
     </main>
 
     <div id="event-modal" class="modal hidden">
@@ -63,8 +97,7 @@
             
             <div class="modal-form-group">
                 <label for="event-type-select">Event Category:</label>
-                <select id="event-type-select">
-                    </select>
+                <select id="event-type-select"></select>
             </div>
 
             <div id="custom-type-fields" class="hidden">
@@ -81,6 +114,40 @@
                     <button id="cancel-event-btn" class="secondary-btn">Cancel</button>
                     <button id="save-event-btn">Save</button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="day-view-modal" class="modal hidden">
+        <div class="modal-content day-view-content">
+            <div class="day-view-header">
+                <h3 id="day-view-title">Date</h3>
+                <button id="close-day-view-btn" class="icon-btn">&times;</button>
+            </div>
+            <div class="day-view-section">
+                <div id="day-view-events"></div>
+            </div>
+            <div class="day-view-section">
+                <div id="day-view-tasks"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="startup-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3>Uncompleted Past Tasks</h3>
+            <p class="modal-desc">You have tasks from previous days that aren't checked off.</p>
+            
+            <div id="overdue-tasks-list" class="overdue-list widget-list"></div>
+            
+            <div class="do-not-ask-group">
+                <input type="checkbox" id="do-not-ask-checkbox">
+                <label for="do-not-ask-checkbox">Do not ask again today</label>
+            </div>
+            
+            <div class="modal-actions" style="margin-top: 15px;">
+                <button id="ignore-overdue-btn" class="secondary-btn">Ignore</button>
+                <button id="shift-overdue-btn">Shift to Today</button>
             </div>
         </div>
     </div>
