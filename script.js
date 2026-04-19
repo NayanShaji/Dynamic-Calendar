@@ -2,6 +2,7 @@
 let types = [];
 let tasks = [];
 let events = [];
+let eventOnlyTypes = []; // NEW: Database for custom event categories
 let currentDate = new Date();
 
 // Modal State Variables
@@ -17,6 +18,9 @@ const sidebarContent = document.getElementById('sidebar-content');
 // Modal Elements
 const eventModal = document.getElementById('event-modal');
 const eventNameInput = document.getElementById('event-name');
+const eventTypeSelect = document.getElementById('event-type-select');
+const customTypeFields = document.getElementById('custom-type-fields');
+const customTypeName = document.getElementById('custom-type-name');
 const eventColorInput = document.getElementById('event-color');
 const modalTitle = document.getElementById('modal-title');
 const deleteEventBtn = document.getElementById('delete-event-btn');
@@ -34,17 +38,20 @@ function saveData() {
     localStorage.setItem('plannerTypes', JSON.stringify(types));
     localStorage.setItem('plannerTasks', JSON.stringify(tasks));
     localStorage.setItem('plannerEvents', JSON.stringify(events));
+    localStorage.setItem('plannerEventOnlyTypes', JSON.stringify(eventOnlyTypes)); // Save custom types
 }
 
 function loadData() {
     const storedTypes = localStorage.getItem('plannerTypes');
     const storedTasks = localStorage.getItem('plannerTasks');
     const storedEvents = localStorage.getItem('plannerEvents');
+    const storedEventOnlyTypes = localStorage.getItem('plannerEventOnlyTypes');
     const storedTheme = localStorage.getItem('plannerTheme');
 
     if (storedTypes) types = JSON.parse(storedTypes);
     if (storedTasks) tasks = JSON.parse(storedTasks);
     if (storedEvents) events = JSON.parse(storedEvents);
+    if (storedEventOnlyTypes) eventOnlyTypes = JSON.parse(storedEventOnlyTypes);
 
     if (storedTheme === 'dark') {
         document.body.classList.add('dark-mode');
@@ -53,7 +60,6 @@ function loadData() {
     }
 }
 
-// Helper to keep cursor focused after pressing Tab/Enter
 function restoreFocus(taskId) {
     setTimeout(() => {
         const input = document.querySelector(`input.task-input[data-id="${taskId}"]`);
@@ -109,7 +115,8 @@ function setupEventListeners() {
     const importFile = document.getElementById('import-file');
 
     exportBtn.addEventListener('click', () => {
-        const data = { types, tasks, events };
+        // Now exporting eventOnlyTypes too!
+        const data = { types, tasks, events, eventOnlyTypes };
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -137,6 +144,7 @@ function setupEventListeners() {
                     types = data.types;
                     tasks = data.tasks;
                     events = data.events || []; 
+                    eventOnlyTypes = data.eventOnlyTypes || []; 
                     saveData();
                     renderTasks();
                     renderCalendar();
@@ -170,7 +178,6 @@ function setupEventListeners() {
             icsContent += "END:VEVENT\n";
         });
 
-        // Only export Parent Tasks to Calendar
         tasks.filter(t => t.assignedDate && !t.parentId).forEach(task => {
             const type = types.find(t => t.id === task.typeId);
             const prefix = type ? `[${type.name}] ` : '';
@@ -212,12 +219,20 @@ function setupEventListeners() {
         const taskId = e.dataTransfer.getData('text/plain');
         const task = tasks.find(t => t.id === taskId);
         
-        // Ensure subtasks aren't dragged
         if (task && !task.parentId) {
             task.assignedDate = null; 
             saveData(); 
             renderTasks();    
             renderCalendar(); 
+        }
+    });
+
+    // --- Modal Logic & Dropdown handling ---
+    eventTypeSelect.addEventListener('change', () => {
+        if (eventTypeSelect.value === 'others') {
+            customTypeFields.classList.remove('hidden');
+        } else {
+            customTypeFields.classList.add('hidden');
         }
     });
 
@@ -227,22 +242,40 @@ function setupEventListeners() {
 
     document.getElementById('save-event-btn').addEventListener('click', () => {
         const name = eventNameInput.value.trim();
-        if (name && targetEventDate) {
-            if (targetEventId) {
-                const evt = events.find(e => e.id === targetEventId);
-                evt.name = name;
-                evt.color = eventColorInput.value;
-            } else {
-                events.push({
-                    id: Date.now().toString(),
-                    date: targetEventDate,
-                    name: name,
-                    color: eventColorInput.value
-                });
-            }
-            saveData(); renderCalendar();
-            eventModal.classList.add('hidden');
+        if (!name || !targetEventDate) return;
+
+        let finalTypeId = eventTypeSelect.value;
+
+        // Handle the "Others" creation process
+        if (finalTypeId === 'others') {
+            const newTypeName = customTypeName.value.trim() || 'Custom Category';
+            const newColor = eventColorInput.value;
+            finalTypeId = Date.now().toString();
+
+            // Save silently to our background array
+            eventOnlyTypes.push({
+                id: finalTypeId,
+                name: newTypeName,
+                color: newColor
+            });
         }
+
+        if (targetEventId) {
+            const evt = events.find(e => e.id === targetEventId);
+            evt.name = name;
+            evt.typeId = finalTypeId;
+        } else {
+            events.push({
+                id: Date.now().toString(),
+                date: targetEventDate,
+                name: name,
+                typeId: finalTypeId
+            });
+        }
+        
+        saveData(); 
+        renderCalendar();
+        eventModal.classList.add('hidden');
     });
 
     deleteEventBtn.addEventListener('click', () => {
@@ -252,6 +285,35 @@ function setupEventListeners() {
             eventModal.classList.add('hidden');
         }
     });
+}
+
+// --- Modal Dropdown Builder ---
+function populateEventTypes(selectedTypeId = null) {
+    eventTypeSelect.innerHTML = '';
+    
+    // Combine Main Tasks Types with Hidden Event Types
+    const allTypes = [...types, ...eventOnlyTypes];
+
+    allTypes.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t.id;
+        opt.textContent = t.name || 'Unnamed Category';
+        if (t.id === selectedTypeId) opt.selected = true;
+        eventTypeSelect.appendChild(opt);
+    });
+
+    const othersOpt = document.createElement('option');
+    othersOpt.value = 'others';
+    othersOpt.textContent = '+ Others (Create New)';
+    if (selectedTypeId === 'others') othersOpt.selected = true;
+    eventTypeSelect.appendChild(othersOpt);
+
+    // Toggle custom fields UI correctly on load
+    if (eventTypeSelect.value === 'others') {
+        customTypeFields.classList.remove('hidden');
+    } else {
+        customTypeFields.classList.add('hidden');
+    }
 }
 
 // --- Inline List Logic ---
@@ -267,7 +329,6 @@ function addNewTask(typeId, parentId = null) {
     const parentType = types.find(t => t.id === typeId);
     if (parentType) parentType.isCollapsed = false;
 
-    // Subtasks cannot have assigned dates
     tasks.push({ id: newId, name: '', typeId, parentId, completed: false, assignedDate: null });
     saveData(); renderTasks();
     restoreFocus(newId);
@@ -281,7 +342,6 @@ function renderTasks() {
         
         const typeTasks = tasks.filter(t => t.typeId === type.id);
         
-        // Progress Bar (counts all tasks & subtasks for accuracy)
         const totalTasks = typeTasks.length;
         const completedTasks = typeTasks.filter(t => t.completed).length;
         const progressPercent = totalTasks === 0 ? 0 : (completedTasks / totalTasks) * 100;
@@ -309,7 +369,6 @@ function renderTasks() {
         const taskListDiv = document.createElement('div');
         taskListDiv.className = `task-list ${isCollapsed ? 'hidden' : ''}`;
         
-        // 1. Render Parent Tasks First
         const parentTasks = typeTasks.filter(t => !t.parentId);
         parentTasks.forEach(parentTask => {
             const taskEl = document.createElement('div');
@@ -328,7 +387,6 @@ function renderTasks() {
             `;
             taskListDiv.appendChild(taskEl);
 
-            // 2. Render Subtasks directly under their Parent
             const subtasks = typeTasks.filter(t => t.parentId === parentTask.id);
             if (subtasks.length > 0) {
                 const subtaskContainer = document.createElement('div');
@@ -379,7 +437,7 @@ function attachInlineListeners() {
             if (type) {
                 type.color = e.target.value;
                 e.target.nextElementSibling.style.backgroundColor = type.color;
-                saveData(); renderCalendar(); renderTasks(); // Updates progress bar colors
+                saveData(); renderCalendar(); renderTasks(); 
             }
         });
     });
@@ -411,31 +469,26 @@ function attachInlineListeners() {
             const task = tasks.find(t => t.id === e.target.dataset.id);
             if (!task) return;
 
-            // ENTER: Create new task (or subtask if currently on a subtask)
             if (e.key === 'Enter') {
                 e.preventDefault();
                 addNewTask(task.typeId, task.parentId); 
             }
 
-            // TAB: Indent / Outdent Logic
             if (e.key === 'Tab') {
                 e.preventDefault();
                 
                 if (e.shiftKey) {
-                    // Outdent (Make subtask into a parent task)
                     if (task.parentId) {
                         task.parentId = null;
                         saveData(); renderTasks(); restoreFocus(task.id);
                     }
                 } else {
-                    // Indent (Make parent task into a subtask)
                     if (!task.parentId) {
-                        // Find the task directly above it to become its parent
                         const typeParentTasks = tasks.filter(t => t.typeId === task.typeId && !t.parentId);
                         const currentIndex = typeParentTasks.findIndex(t => t.id === task.id);
                         if (currentIndex > 0) {
                             task.parentId = typeParentTasks[currentIndex - 1].id;
-                            task.assignedDate = null; // Remove subtasks from calendar
+                            task.assignedDate = null; 
                             saveData(); renderTasks(); renderCalendar(); restoreFocus(task.id);
                         }
                     }
@@ -446,7 +499,6 @@ function attachInlineListeners() {
         input.addEventListener('blur', (e) => {
             if (e.target.value.trim() === '') {
                 const taskId = e.target.dataset.id;
-                // Delete task, and any subtasks attached to it
                 tasks = tasks.filter(t => t.id !== taskId && t.parentId !== taskId);
                 saveData(); renderTasks(); renderCalendar();
             }
@@ -473,12 +525,18 @@ function openEventModal(dateStr, evtId = null) {
         const evt = events.find(e => e.id === evtId);
         modalTitle.textContent = "Edit Event";
         eventNameInput.value = evt.name;
-        eventColorInput.value = evt.color;
+        
+        // Load the dropdown with the event's type
+        populateEventTypes(evt.typeId);
         deleteEventBtn.classList.remove('hidden');
     } else {
         modalTitle.textContent = "Add Event";
         eventNameInput.value = '';
+        customTypeName.value = '';
         eventColorInput.value = '#ffeb3b';
+        
+        // Load dropdown fresh
+        populateEventTypes();
         deleteEventBtn.classList.add('hidden');
     }
 
@@ -496,6 +554,9 @@ function renderCalendar() {
     const firstDay = new Date(year, month, 1).getDay();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
 
+    const realToday = new Date();
+    const todayStr = `${realToday.getFullYear()}-${String(realToday.getMonth() + 1).padStart(2, '0')}-${String(realToday.getDate()).padStart(2, '0')}`;
+
     for (let i = 0; i < firstDay; i++) {
         const emptyCell = document.createElement('div');
         emptyCell.classList.add('day-cell', 'empty-day');
@@ -507,6 +568,11 @@ function renderCalendar() {
         
         const cell = document.createElement('div');
         cell.classList.add('day-cell');
+        
+        if (dateStr === todayStr) {
+            cell.classList.add('today-highlight');
+        }
+
         cell.dataset.date = dateStr;
         
         cell.innerHTML = `
@@ -535,7 +601,6 @@ function renderCalendar() {
             const taskId = e.dataTransfer.getData('text/plain');
             const task = tasks.find(t => t.id === taskId);
             
-            // Only allow dropping Parent Tasks
             if (task && task.assignedDate !== dateStr && !task.parentId) {
                 task.assignedDate = dateStr;
                 saveData(); 
@@ -544,9 +609,22 @@ function renderCalendar() {
             }
         });
 
+        // Event Rendering (Updated to fetch linked colors)
         const dayEvents = events.filter(e => e.date === dateStr);
         if (dayEvents.length > 0) {
-            cell.style.backgroundColor = getTranslucentColor(dayEvents[0].color, 0.3);
+            let dayColor = '#ffeb3b'; // Fallback
+            const firstEvt = dayEvents[0];
+            
+            // Check both visible Types and hidden Event Types for the color
+            if (firstEvt.typeId) {
+                const matchedType = types.find(t => t.id === firstEvt.typeId) || eventOnlyTypes.find(t => t.id === firstEvt.typeId);
+                if (matchedType) dayColor = matchedType.color;
+            } else if (firstEvt.color) { 
+                dayColor = firstEvt.color; // Support for older backups
+            }
+
+            cell.style.backgroundColor = getTranslucentColor(dayColor, 0.3);
+            
             dayEvents.forEach(evt => {
                 const evtEl = document.createElement('div');
                 evtEl.className = 'calendar-event';
@@ -556,7 +634,6 @@ function renderCalendar() {
             });
         }
 
-        // Only render Parent Tasks in Calendar
         const dayTasks = tasks.filter(t => t.assignedDate === dateStr && !t.parentId);
         dayTasks.forEach(task => {
             const type = types.find(t => t.id === task.typeId);
