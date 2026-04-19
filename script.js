@@ -8,13 +8,14 @@ let eventOnlyTypes = [];
 let viewStartDate = new Date();
 let currentSelectedMonth = viewStartDate.getMonth();
 let currentSelectedYear = viewStartDate.getFullYear();
-
-// Display State
 let isMobilePortrait = window.innerWidth <= 768 && window.innerHeight > window.innerWidth;
 
 // Modal State Variables
 let targetEventDate = null; 
 let targetEventId = null;
+
+const PRESET_COLORS = ['#e74c3c', '#e67e22', '#f1c40f', '#2ecc71', '#1abc9c', '#3498db', '#2980b9', '#9b59b6', '#8e44ad', '#fd79a8', '#f368e0', '#00cec9', '#badc58', '#d35400', '#2c3e50'];
+let activeColorTypeId = null;
 
 // DOM Elements
 const taskListContainer = document.getElementById('task-list-container');
@@ -23,15 +24,12 @@ const sidebarContent = document.getElementById('sidebar-content');
 const todaysTasksList = document.getElementById('todays-tasks-list');
 const sidebar = document.getElementById('sidebar');
 
-// Mobile UI Elements
 const mobileMenuBtn = document.getElementById('mobile-menu-btn');
 const mobileOverlay = document.getElementById('mobile-overlay');
 
-// Header Dropdowns
 const monthSelect = document.getElementById('month-select');
 const yearSelect = document.getElementById('year-select');
 
-// Event Modal Elements
 const eventModal = document.getElementById('event-modal');
 const eventNameInput = document.getElementById('event-name');
 const eventTypeSelect = document.getElementById('event-type-select');
@@ -41,19 +39,22 @@ const eventColorInput = document.getElementById('event-color');
 const modalTitle = document.getElementById('modal-title');
 const deleteEventBtn = document.getElementById('delete-event-btn');
 
-// Day View Modal Elements
 const dayViewModal = document.getElementById('day-view-modal');
 const closeDayViewBtn = document.getElementById('close-day-view-btn');
 const dayViewTitle = document.getElementById('day-view-title');
 const dayViewEvents = document.getElementById('day-view-events');
 const dayViewTasks = document.getElementById('day-view-tasks');
 
-// Startup Modal Elements
 const startupModal = document.getElementById('startup-modal');
 const overdueTasksList = document.getElementById('overdue-tasks-list');
 const doNotAskCheckbox = document.getElementById('do-not-ask-checkbox');
 const ignoreOverdueBtn = document.getElementById('ignore-overdue-btn');
 const shiftOverdueBtn = document.getElementById('shift-overdue-btn');
+
+const colorPickerModal = document.getElementById('color-picker-modal');
+const colorGrid = document.getElementById('color-grid');
+const closeColorPickerBtn = document.getElementById('close-color-picker-btn');
+const hiddenCustomColorInput = document.getElementById('hidden-custom-color');
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -81,13 +82,20 @@ function getTodayStr() {
     return `${realToday.getFullYear()}-${String(realToday.getMonth() + 1).padStart(2, '0')}-${String(realToday.getDate()).padStart(2, '0')}`;
 }
 
-function getTranslucentColor(hex, opacity = 0.3) {
+function getTranslucentColor(hex, opacity = 0.5) {
     hex = hex.replace('#', '');
     if (hex.length === 3) hex = hex.split('').map(x => x + x).join('');
     const r = parseInt(hex.substring(0, 2), 16);
     const g = parseInt(hex.substring(2, 4), 16);
     const b = parseInt(hex.substring(4, 6), 16);
     return `rgba(${r}, ${g}, ${b}, ${opacity})`;
+}
+
+// RESTORED: Opacity check for Dark Mode (set to 0.5 instead of 0.3)
+function getModeColor(hex) {
+    if (!hex) hex = '#ccc';
+    const isDark = document.body.classList.contains('dark-mode');
+    return isDark ? getTranslucentColor(hex, 0.5) : hex;
 }
 
 function restoreFocus(taskId) {
@@ -98,6 +106,56 @@ function restoreFocus(taskId) {
             input.selectionStart = input.selectionEnd = input.value.length;
         }
     }, 0);
+}
+
+// --- Color Picker Logic ---
+function getUnusedColor() {
+    const usedColors = types.map(t => t.color.toLowerCase());
+    for (let color of PRESET_COLORS) {
+        if (!usedColors.includes(color.toLowerCase())) {
+            return color;
+        }
+    }
+    return PRESET_COLORS[0];
+}
+
+function openColorPickerModal(typeId, currentColor) {
+    activeColorTypeId = typeId;
+    colorGrid.innerHTML = '';
+
+    PRESET_COLORS.forEach(color => {
+        const circle = document.createElement('div');
+        circle.className = `color-circle ${color.toLowerCase() === currentColor.toLowerCase() ? 'selected' : ''}`;
+        circle.style.backgroundColor = color;
+        circle.addEventListener('click', () => applyColorToType(color));
+        colorGrid.appendChild(circle);
+    });
+
+    const customBtn = document.createElement('div');
+    customBtn.className = 'custom-color-btn';
+    customBtn.innerHTML = '+';
+    customBtn.title = "Custom Color";
+    customBtn.addEventListener('click', () => {
+        hiddenCustomColorInput.value = currentColor;
+        hiddenCustomColorInput.click();
+    });
+    colorGrid.appendChild(customBtn);
+
+    colorPickerModal.classList.remove('hidden');
+}
+
+function applyColorToType(hexColor) {
+    if (activeColorTypeId) {
+        const type = types.find(t => t.id === activeColorTypeId);
+        if (type) {
+            type.color = hexColor;
+            saveData();
+            renderTasks();
+            renderCalendar();
+            renderTodaysTasksWidget();
+        }
+    }
+    colorPickerModal.classList.add('hidden');
 }
 
 // --- Local Storage Functions ---
@@ -171,7 +229,7 @@ function checkStartupTasks() {
             const taskEl = document.createElement('div');
             taskEl.className = 'widget-task';
             taskEl.innerHTML = `
-                <span class="color-dot" style="background-color: ${type ? type.color : '#ccc'};"></span>
+                <span class="color-dot" style="background-color: ${getModeColor(type ? type.color : '#ccc')};"></span>
                 <span class="task-text">${task.name}</span> 
                 <span style="font-size: 0.7rem; color: #888; margin-left: auto;">(${task.assignedDate})</span>
             `;
@@ -206,7 +264,7 @@ function renderTodaysTasksWidget() {
         taskEl.className = `widget-task ${task.completed ? 'completed' : ''}`;
         
         taskEl.innerHTML = `
-            <span class="color-dot" style="background-color: ${type ? type.color : '#ccc'};"></span>
+            <span class="color-dot" style="background-color: ${getModeColor(type ? type.color : '#ccc')};"></span>
             <input type="checkbox" ${task.completed ? 'checked' : ''} data-id="${task.id}">
             <span class="task-text">${task.name}</span>
             ${isOverdue ? '<span class="overdue-badge">Overdue</span>' : ''}
@@ -231,6 +289,14 @@ function renderTodaysTasksWidget() {
 // --- App Logic & Listeners ---
 function setupEventListeners() {
     
+    hiddenCustomColorInput.addEventListener('input', (e) => {
+        applyColorToType(e.target.value);
+    });
+
+    closeColorPickerBtn.addEventListener('click', () => {
+        colorPickerModal.classList.add('hidden');
+    });
+
     if (mobileMenuBtn && mobileOverlay) {
         mobileMenuBtn.addEventListener('click', () => {
             sidebar.classList.add('open');
@@ -240,6 +306,31 @@ function setupEventListeners() {
         mobileOverlay.addEventListener('click', () => {
             sidebar.classList.remove('open');
             mobileOverlay.classList.remove('active');
+        });
+
+        mobileMenuBtn.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            mobileMenuBtn.style.opacity = '0.5';
+            mobileMenuBtn.style.transform = 'scale(1.1)';
+        });
+        mobileMenuBtn.addEventListener('dragleave', () => {
+            mobileMenuBtn.style.opacity = '1';
+            mobileMenuBtn.style.transform = 'none';
+        });
+        mobileMenuBtn.addEventListener('drop', (e) => {
+            e.preventDefault();
+            mobileMenuBtn.style.opacity = '1';
+            mobileMenuBtn.style.transform = 'none';
+            const taskId = e.dataTransfer.getData('text/plain');
+            const task = tasks.find(t => t.id === taskId);
+            
+            if (task && !task.parentId) {
+                task.assignedDate = null; 
+                saveData(); 
+                renderTasks();    
+                renderCalendar(); 
+                renderTodaysTasksWidget();
+            }
         });
     }
 
@@ -288,6 +379,14 @@ function setupEventListeners() {
             moonIcon.style.display = 'block';
             sunIcon.style.display = 'none';
             localStorage.setItem('plannerTheme', 'light');
+        }
+
+        // Live refresh to catch the opacity changes instantly
+        renderTasks();
+        renderCalendar();
+        renderTodaysTasksWidget();
+        if (!dayViewModal.classList.contains('hidden') && targetEventDate) {
+            openDayViewModal(targetEventDate);
         }
     });
 
@@ -369,123 +468,72 @@ function setupEventListeners() {
         e.target.value = ''; 
     });
 
-    // Touch Event Listeners for Mobile Drag & Drop
-    let touchTimer = null;
-    let ghostEl = null;
-    let draggedTaskEl = null;
-    let activeTouchTask = null;
-    let currentDropTarget = null;
+    const exportIcsBtn = document.getElementById('export-ics-btn');
+    exportIcsBtn.addEventListener('click', () => {
+        let icsContent = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//My Planner App//EN\n";
 
-    document.addEventListener('touchstart', (e) => {
-        const taskEl = e.target.closest('.task-item[draggable="true"], .calendar-task[draggable="true"]');
-        if (!taskEl || e.target.type === 'checkbox' || e.target.tagName.toLowerCase() === 'button') return;
-        
-        const taskId = taskEl.dataset.taskId;
-        activeTouchTask = tasks.find(t => t.id === taskId);
-        if (!activeTouchTask || activeTouchTask.parentId) return; // Only parent tasks drag
+        const formatIcsDate = (dateStr, addDays = 0) => {
+            const parts = dateStr.split('-');
+            const d = new Date(parts[0], parts[1] - 1, parts[2]);
+            d.setDate(d.getDate() + addDays);
+            return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+        };
 
-        if (e.touches.length > 1) return;
-        const touch = e.touches[0];
-        
-        touchTimer = setTimeout(() => {
-            draggedTaskEl = taskEl;
-            taskEl.style.opacity = '0.5';
+        events.forEach(evt => {
+            icsContent += "BEGIN:VEVENT\n";
+            icsContent += `SUMMARY:★ ${evt.name}\n`;
+            icsContent += `DTSTART;VALUE=DATE:${formatIcsDate(evt.date)}\n`;
+            icsContent += `DTEND;VALUE=DATE:${formatIcsDate(evt.date, 1)}\n`; 
+            icsContent += "END:VEVENT\n";
+        });
+
+        tasks.filter(t => t.assignedDate && !t.parentId).forEach(task => {
+            const type = types.find(t => t.id === task.typeId);
+            const prefix = type ? `[${type.name}] ` : '';
+            const status = task.completed ? "COMPLETED" : "NEEDS-ACTION";
             
-            ghostEl = taskEl.cloneNode(true);
-            ghostEl.style.position = 'fixed';
-            ghostEl.style.zIndex = '9999';
-            ghostEl.style.opacity = '0.8';
-            ghostEl.style.pointerEvents = 'none';
-            ghostEl.style.width = taskEl.offsetWidth + 'px';
-            ghostEl.style.left = (touch.clientX - taskEl.offsetWidth/2) + 'px';
-            ghostEl.style.top = (touch.clientY - taskEl.offsetHeight/2) + 'px';
-            ghostEl.style.boxShadow = '0 5px 15px rgba(0,0,0,0.3)';
-            document.body.appendChild(ghostEl);
+            icsContent += "BEGIN:VEVENT\n";
+            icsContent += `SUMMARY:${prefix}${task.name}\n`;
+            icsContent += `DTSTART;VALUE=DATE:${formatIcsDate(task.assignedDate)}\n`;
+            icsContent += `DTEND;VALUE=DATE:${formatIcsDate(task.assignedDate, 1)}\n`;
+            icsContent += `STATUS:${status}\n`;
+            icsContent += "END:VEVENT\n";
+        });
 
-            if (navigator.vibrate) navigator.vibrate(50);
+        icsContent += "END:VCALENDAR";
 
-            // Close sidebar to reveal calendar
-            if (window.innerWidth <= 768) {
-                if (sidebar) sidebar.classList.remove('open');
-                if (mobileOverlay) mobileOverlay.classList.remove('active');
-            }
-        }, 400); // 400ms long press
-    }, {passive: false});
-
-    document.addEventListener('touchmove', (e) => {
-        if (touchTimer) { clearTimeout(touchTimer); touchTimer = null; }
-        if (!ghostEl) return;
-        e.preventDefault(); // Stop screen from scrolling while dragging
-
-        const touch = e.touches[0];
-        ghostEl.style.left = (touch.clientX - ghostEl.offsetWidth/2) + 'px';
-        ghostEl.style.top = (touch.clientY - ghostEl.offsetHeight/2) + 'px';
-
-        const elements = document.elementsFromPoint(touch.clientX, touch.clientY);
-        const dropCell = elements.find(el => el.classList.contains('day-cell') || el.id === 'mobile-menu-btn');
-
-        if (currentDropTarget && currentDropTarget !== dropCell) {
-            currentDropTarget.classList.remove('drag-over');
-            if (currentDropTarget.id === 'mobile-menu-btn') {
-                currentDropTarget.style.transform = 'none';
-                currentDropTarget.style.opacity = '1';
-            }
-        }
-
-        if (dropCell) {
-            if (dropCell.classList.contains('day-cell')) {
-                dropCell.classList.add('drag-over');
-            } else if (dropCell.id === 'mobile-menu-btn') {
-                dropCell.style.transform = 'scale(1.1)';
-                dropCell.style.opacity = '0.5';
-            }
-        }
-        currentDropTarget = dropCell;
-    }, {passive: false});
-
-    document.addEventListener('touchend', (e) => {
-        if (touchTimer) { clearTimeout(touchTimer); touchTimer = null; }
-        if (!ghostEl) return;
-
-        ghostEl.remove();
-        ghostEl = null;
-
-        if (draggedTaskEl) {
-            draggedTaskEl.style.opacity = '1';
-            draggedTaskEl = null;
-        }
-
-        if (currentDropTarget && activeTouchTask) {
-            currentDropTarget.classList.remove('drag-over');
-            if (currentDropTarget.classList.contains('day-cell')) {
-                const dateStr = currentDropTarget.dataset.date;
-                if (activeTouchTask.assignedDate !== dateStr) {
-                    activeTouchTask.assignedDate = dateStr;
-                    saveData(); renderTasks(); renderCalendar(); renderTodaysTasksWidget();
-                }
-            } else if (currentDropTarget.id === 'mobile-menu-btn') {
-                currentDropTarget.style.transform = 'none';
-                currentDropTarget.style.opacity = '1';
-                if (activeTouchTask.assignedDate !== null) {
-                    activeTouchTask.assignedDate = null; // Drop on hamburger un-assigns it!
-                    saveData(); renderTasks(); renderCalendar(); renderTodaysTasksWidget();
-                }
-            }
-            currentDropTarget = null;
-        }
-        activeTouchTask = null;
+        const blob = new Blob([icsContent], { type: 'text/calendar' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `planner-export-${new Date().toISOString().split('T')[0]}.ics`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     });
 
-    document.addEventListener('touchcancel', () => {
-        if (touchTimer) { clearTimeout(touchTimer); touchTimer = null; }
-        if (ghostEl) { ghostEl.remove(); ghostEl = null; }
-        if (draggedTaskEl) { draggedTaskEl.style.opacity = '1'; draggedTaskEl = null; }
-        activeTouchTask = null;
-        if (currentDropTarget) {
-            currentDropTarget.classList.remove('drag-over');
-            currentDropTarget.style.transform = 'none';
-            currentDropTarget.style.opacity = '1';
-            currentDropTarget = null;
+    sidebarContent.addEventListener('dragover', (e) => {
+        e.preventDefault(); 
+        sidebarContent.classList.add('drag-over');
+    });
+
+    sidebarContent.addEventListener('dragleave', () => {
+        sidebarContent.classList.remove('drag-over');
+    });
+
+    sidebarContent.addEventListener('drop', (e) => {
+        e.preventDefault();
+        sidebarContent.classList.remove('drag-over');
+        const taskId = e.dataTransfer.getData('text/plain');
+        const task = tasks.find(t => t.id === taskId);
+        
+        if (task && !task.parentId) {
+            task.assignedDate = null; 
+            saveData(); 
+            renderTasks();    
+            renderCalendar(); 
+            renderTodaysTasksWidget();
         }
     });
 
@@ -552,6 +600,124 @@ function setupEventListeners() {
     closeDayViewBtn.addEventListener('click', () => {
         dayViewModal.classList.add('hidden');
     });
+
+    let touchTimer = null;
+    let ghostEl = null;
+    let draggedTaskEl = null;
+    let activeTouchTask = null;
+    let currentDropTarget = null;
+
+    document.addEventListener('touchstart', (e) => {
+        const taskEl = e.target.closest('.task-item[draggable="true"], .calendar-task[draggable="true"]');
+        if (!taskEl || e.target.type === 'checkbox' || e.target.tagName.toLowerCase() === 'button') return;
+        
+        const taskId = taskEl.dataset.taskId;
+        activeTouchTask = tasks.find(t => t.id === taskId);
+        if (!activeTouchTask || activeTouchTask.parentId) return; 
+
+        if (e.touches.length > 1) return;
+        const touch = e.touches[0];
+        
+        touchTimer = setTimeout(() => {
+            draggedTaskEl = taskEl;
+            taskEl.style.opacity = '0.5';
+            
+            ghostEl = taskEl.cloneNode(true);
+            ghostEl.style.position = 'fixed';
+            ghostEl.style.zIndex = '9999';
+            ghostEl.style.opacity = '0.8';
+            ghostEl.style.pointerEvents = 'none';
+            ghostEl.style.width = taskEl.offsetWidth + 'px';
+            ghostEl.style.left = (touch.clientX - taskEl.offsetWidth/2) + 'px';
+            ghostEl.style.top = (touch.clientY - taskEl.offsetHeight/2) + 'px';
+            ghostEl.style.boxShadow = '0 5px 15px rgba(0,0,0,0.3)';
+            document.body.appendChild(ghostEl);
+
+            if (navigator.vibrate) navigator.vibrate(50);
+
+            if (window.innerWidth <= 768) {
+                if (sidebar) sidebar.classList.remove('open');
+                if (mobileOverlay) mobileOverlay.classList.remove('active');
+            }
+        }, 400); 
+    }, {passive: false});
+
+    document.addEventListener('touchmove', (e) => {
+        if (touchTimer) { clearTimeout(touchTimer); touchTimer = null; }
+        if (!ghostEl) return;
+        e.preventDefault(); 
+
+        const touch = e.touches[0];
+        ghostEl.style.left = (touch.clientX - ghostEl.offsetWidth/2) + 'px';
+        ghostEl.style.top = (touch.clientY - ghostEl.offsetHeight/2) + 'px';
+
+        const elements = document.elementsFromPoint(touch.clientX, touch.clientY);
+        const dropCell = elements.find(el => el.classList.contains('day-cell') || el.id === 'mobile-menu-btn');
+
+        if (currentDropTarget && currentDropTarget !== dropCell) {
+            currentDropTarget.classList.remove('drag-over');
+            if (currentDropTarget.id === 'mobile-menu-btn') {
+                currentDropTarget.style.transform = 'none';
+                currentDropTarget.style.opacity = '1';
+            }
+        }
+
+        if (dropCell) {
+            if (dropCell.classList.contains('day-cell')) {
+                dropCell.classList.add('drag-over');
+            } else if (dropCell.id === 'mobile-menu-btn') {
+                dropCell.style.transform = 'scale(1.1)';
+                dropCell.style.opacity = '0.5';
+            }
+        }
+        currentDropTarget = dropCell;
+    }, {passive: false});
+
+    document.addEventListener('touchend', (e) => {
+        if (touchTimer) { clearTimeout(touchTimer); touchTimer = null; }
+        if (!ghostEl) return;
+
+        ghostEl.remove();
+        ghostEl = null;
+
+        if (draggedTaskEl) {
+            draggedTaskEl.style.opacity = '1';
+            draggedTaskEl = null;
+        }
+
+        if (currentDropTarget && activeTouchTask) {
+            currentDropTarget.classList.remove('drag-over');
+            if (currentDropTarget.classList.contains('day-cell')) {
+                const dateStr = currentDropTarget.dataset.date;
+                if (activeTouchTask.assignedDate !== dateStr) {
+                    activeTouchTask.assignedDate = dateStr;
+                    saveData(); renderTasks(); renderCalendar(); renderTodaysTasksWidget();
+                }
+            } else if (currentDropTarget.id === 'mobile-menu-btn') {
+                currentDropTarget.style.transform = 'none';
+                currentDropTarget.style.opacity = '1';
+                if (activeTouchTask.assignedDate !== null) {
+                    activeTouchTask.assignedDate = null; 
+                    saveData(); renderTasks(); renderCalendar(); renderTodaysTasksWidget();
+                }
+            }
+            currentDropTarget = null;
+        }
+        activeTouchTask = null;
+    });
+
+    document.addEventListener('touchcancel', () => {
+        if (touchTimer) { clearTimeout(touchTimer); touchTimer = null; }
+        if (ghostEl) { ghostEl.remove(); ghostEl = null; }
+        if (draggedTaskEl) { draggedTaskEl.style.opacity = '1'; draggedTaskEl = null; }
+        activeTouchTask = null;
+        if (currentDropTarget) {
+            currentDropTarget.classList.remove('drag-over');
+            currentDropTarget.style.transform = 'none';
+            currentDropTarget.style.opacity = '1';
+            currentDropTarget = null;
+        }
+    });
 }
 
 function populateEventTypes(selectedTypeId = null) {
@@ -582,7 +748,8 @@ function populateEventTypes(selectedTypeId = null) {
 // --- Inline List Logic ---
 function addNewType() {
     const newId = Date.now().toString();
-    types.push({ id: newId, name: '', color: '#3498db', isCollapsed: false });
+    const assignedColor = getUnusedColor();
+    types.push({ id: newId, name: '', color: assignedColor, isCollapsed: false });
     saveData(); renderTasks();
     restoreFocus(newId);
 }
@@ -617,9 +784,8 @@ function renderTasks() {
         typeHeader.innerHTML = `
             <span class="drag-handle" style="visibility: hidden; cursor: default;">⋮⋮</span>
             <span class="collapse-toggle ${isCollapsed ? 'collapsed' : ''}" data-id="${type.id}">▼</span>
-            <div class="color-picker-container" title="Click to change color">
-                <input type="color" class="hidden-color-picker" value="${type.color}" data-id="${type.id}">
-                <div class="color-dot" style="background-color: ${type.color};"></div>
+            <div class="color-picker-container" title="Click to change color" data-id="${type.id}" data-color="${type.color}">
+                <div class="color-dot" style="background-color: ${getModeColor(type.color)};"></div>
             </div>
             <input type="text" class="inline-input type-input" value="${type.name}" placeholder="Type name..." data-id="${type.id}">
         `;
@@ -638,7 +804,7 @@ function renderTasks() {
             const taskEl = document.createElement('div');
             taskEl.className = `task-item flex-row ${parentTask.completed ? 'completed' : ''} ${parentTask.assignedDate ? 'translucent' : ''}`;
             taskEl.draggable = true; 
-            taskEl.dataset.taskId = parentTask.id; // Added for touch logic
+            taskEl.dataset.taskId = parentTask.id; 
             
             taskEl.addEventListener('dragstart', (e) => {
                 e.dataTransfer.setData('text/plain', parentTask.id);
@@ -705,14 +871,9 @@ function attachInlineListeners() {
         });
     });
 
-    document.querySelectorAll('.hidden-color-picker').forEach(picker => {
-        picker.addEventListener('input', (e) => {
-            const type = types.find(t => t.id === e.target.dataset.id);
-            if (type) {
-                type.color = e.target.value;
-                e.target.nextElementSibling.style.backgroundColor = type.color;
-                saveData(); renderCalendar(); renderTasks(); renderTodaysTasksWidget();
-            }
+    document.querySelectorAll('.color-picker-container').forEach(container => {
+        container.addEventListener('click', () => {
+            openColorPickerModal(container.dataset.id, container.dataset.color);
         });
     });
 
@@ -835,7 +996,7 @@ function openDayViewModal(dateStr) {
             const taskEl = document.createElement('div');
             taskEl.className = `calendar-task ${task.completed ? 'completed' : ''}`;
             taskEl.innerHTML = `
-                <span class="color-dot" style="background-color: ${type ? type.color : '#ccc'}; width: 10px; height: 10px; display: inline-block; border-radius: 50%;"></span>
+                <span class="color-dot" style="background-color: ${getModeColor(type ? type.color : '#ccc')}; width: 10px; height: 10px; display: inline-block; border-radius: 50%;"></span>
                 <input type="checkbox" ${task.completed ? 'checked' : ''} data-id="${task.id}">
                 <span>${task.name}</span>
             `;
@@ -911,6 +1072,10 @@ function renderCalendar() {
                 <div class="day-number">${loopDay}</div>
             </div>
         `;
+        
+        const dayContent = document.createElement('div');
+        dayContent.className = 'day-content';
+        cell.appendChild(dayContent);
 
         cell.addEventListener('click', (e) => {
             if (e.target.closest('.add-event-btn') || e.target.type === 'checkbox' || e.target.closest('.calendar-event')) return;
@@ -962,7 +1127,19 @@ function renderCalendar() {
                 dayColor = firstEvt.color; 
             }
 
-            cell.style.backgroundColor = getTranslucentColor(dayColor, 0.3);
+            // RESTORED: Applies the 0.5 opacity only when Dark Mode is active
+            cell.style.backgroundColor = getModeColor(dayColor);
+            
+            // Apply text formatting to ensure solid background readability
+            const isDark = document.body.classList.contains('dark-mode');
+            if (!isDark) {
+                const dayNum = cell.querySelector('.day-number');
+                const addBtn = cell.querySelector('.add-event-btn');
+                dayNum.style.color = '#fff';
+                dayNum.style.textShadow = '0 1px 3px rgba(0,0,0,0.7)';
+                addBtn.style.color = '#fff';
+                addBtn.style.textShadow = '0 1px 3px rgba(0,0,0,0.7)';
+            }
             
             dayEvents.forEach(evt => {
                 if (renderedCount < 2) {
@@ -973,7 +1150,7 @@ function renderCalendar() {
                         e.stopPropagation(); 
                         openEventModal(dateStr, evt.id);
                     });
-                    cell.appendChild(evtEl);
+                    dayContent.appendChild(evtEl);
                     renderedCount++;
                 }
             });
@@ -986,7 +1163,7 @@ function renderCalendar() {
                 taskEl.className = `calendar-task ${task.completed ? 'completed' : ''}`;
                 
                 taskEl.draggable = true;
-                taskEl.dataset.taskId = task.id; // Added for touch logic
+                taskEl.dataset.taskId = task.id; 
                 
                 taskEl.addEventListener('dragstart', (e) => {
                     e.dataTransfer.setData('text/plain', task.id);
@@ -994,7 +1171,7 @@ function renderCalendar() {
                 });
 
                 taskEl.innerHTML = `
-                    <span class="color-dot" style="background-color: ${type ? type.color : '#ccc'}; width: 10px; height: 10px; display: inline-block; border-radius: 50%;"></span>
+                    <span class="color-dot" style="background-color: ${getModeColor(type ? type.color : '#ccc')}; width: 10px; height: 10px; display: inline-block; border-radius: 50%;"></span>
                     <input type="checkbox" ${task.completed ? 'checked' : ''}>
                     <span>${task.name}</span>
                 `;
@@ -1004,7 +1181,7 @@ function renderCalendar() {
                     saveData(); renderTasks(); renderCalendar(); renderTodaysTasksWidget();
                 });
 
-                cell.appendChild(taskEl);
+                dayContent.appendChild(taskEl);
                 renderedCount++;
             }
         });
@@ -1013,6 +1190,13 @@ function renderCalendar() {
             const moreEl = document.createElement('div');
             moreEl.className = 'more-indicator';
             moreEl.textContent = `+${totalItems - 2} more`;
+
+            const isDark = document.body.classList.contains('dark-mode');
+            if (dayEvents.length > 0 && !isDark) {
+                moreEl.style.color = '#fff';
+                moreEl.style.textShadow = '0 1px 3px rgba(0,0,0,0.7)';
+            }
+
             cell.appendChild(moreEl);
         }
 
