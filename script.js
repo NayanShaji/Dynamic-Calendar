@@ -40,12 +40,30 @@ function loadData() {
     const storedTypes = localStorage.getItem('plannerTypes');
     const storedTasks = localStorage.getItem('plannerTasks');
     const storedEvents = localStorage.getItem('plannerEvents');
+    const storedTheme = localStorage.getItem('plannerTheme');
+
     if (storedTypes) types = JSON.parse(storedTypes);
     if (storedTasks) tasks = JSON.parse(storedTasks);
     if (storedEvents) events = JSON.parse(storedEvents);
+
+    if (storedTheme === 'dark') {
+        document.body.classList.add('dark-mode');
+        document.getElementById('moon-icon').style.display = 'none';
+        document.getElementById('sun-icon').style.display = 'block';
+    }
 }
 
-// --- Helper: Convert Hex to Translucent RGBA ---
+// Helper to keep cursor focused after pressing Tab/Enter
+function restoreFocus(taskId) {
+    setTimeout(() => {
+        const input = document.querySelector(`input.task-input[data-id="${taskId}"]`);
+        if (input) {
+            input.focus();
+            input.selectionStart = input.selectionEnd = input.value.length;
+        }
+    }, 0);
+}
+
 function getTranslucentColor(hex, opacity = 0.3) {
     hex = hex.replace('#', '');
     if (hex.length === 3) hex = hex.split('').map(x => x + x).join('');
@@ -67,12 +85,29 @@ function setupEventListeners() {
         currentDate.setMonth(currentDate.getMonth() + 1); renderCalendar();
     });
 
-    // --- Import / Export Logic ---
+    const themeToggleBtn = document.getElementById('theme-toggle-btn');
+    const moonIcon = document.getElementById('moon-icon');
+    const sunIcon = document.getElementById('sun-icon');
+
+    themeToggleBtn.addEventListener('click', () => {
+        document.body.classList.toggle('dark-mode');
+        const isDark = document.body.classList.contains('dark-mode');
+        
+        if (isDark) {
+            moonIcon.style.display = 'none';
+            sunIcon.style.display = 'block';
+            localStorage.setItem('plannerTheme', 'dark');
+        } else {
+            moonIcon.style.display = 'block';
+            sunIcon.style.display = 'none';
+            localStorage.setItem('plannerTheme', 'light');
+        }
+    });
+
     const exportBtn = document.getElementById('export-btn');
     const importBtn = document.getElementById('import-btn');
     const importFile = document.getElementById('import-file');
 
-    // Export Data (JSON)
     exportBtn.addEventListener('click', () => {
         const data = { types, tasks, events };
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -86,7 +121,6 @@ function setupEventListeners() {
         URL.revokeObjectURL(url);
     });
 
-    // Import Data (JSON)
     importBtn.addEventListener('click', () => {
         importFile.click(); 
     });
@@ -117,7 +151,6 @@ function setupEventListeners() {
         e.target.value = ''; 
     });
 
-    // Export to ICS (Google Calendar)
     const exportIcsBtn = document.getElementById('export-ics-btn');
     exportIcsBtn.addEventListener('click', () => {
         let icsContent = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//My Planner App//EN\n";
@@ -137,7 +170,8 @@ function setupEventListeners() {
             icsContent += "END:VEVENT\n";
         });
 
-        tasks.filter(t => t.assignedDate).forEach(task => {
+        // Only export Parent Tasks to Calendar
+        tasks.filter(t => t.assignedDate && !t.parentId).forEach(task => {
             const type = types.find(t => t.id === task.typeId);
             const prefix = type ? `[${type.name}] ` : '';
             const status = task.completed ? "COMPLETED" : "NEEDS-ACTION";
@@ -163,7 +197,6 @@ function setupEventListeners() {
         URL.revokeObjectURL(url);
     });
 
-    // --- Sidebar Drop Zone Logic ---
     sidebarContent.addEventListener('dragover', (e) => {
         e.preventDefault(); 
         sidebarContent.classList.add('drag-over');
@@ -179,7 +212,8 @@ function setupEventListeners() {
         const taskId = e.dataTransfer.getData('text/plain');
         const task = tasks.find(t => t.id === taskId);
         
-        if (task) {
+        // Ensure subtasks aren't dragged
+        if (task && !task.parentId) {
             task.assignedDate = null; 
             saveData(); 
             renderTasks();    
@@ -187,7 +221,6 @@ function setupEventListeners() {
         }
     });
 
-    // --- Modal Logic ---
     document.getElementById('cancel-event-btn').addEventListener('click', () => {
         eventModal.classList.add('hidden');
     });
@@ -224,16 +257,20 @@ function setupEventListeners() {
 // --- Inline List Logic ---
 function addNewType() {
     const newId = Date.now().toString();
-    types.push({ id: newId, name: '', color: '#3498db' });
+    types.push({ id: newId, name: '', color: '#3498db', isCollapsed: false });
     saveData(); renderTasks();
-    setTimeout(() => document.querySelector(`input.type-input[data-id="${newId}"]`).focus(), 0);
+    restoreFocus(newId);
 }
 
-function addNewTask(typeId) {
+function addNewTask(typeId, parentId = null) {
     const newId = Date.now().toString();
-    tasks.push({ id: newId, name: '', typeId, completed: false, assignedDate: null });
+    const parentType = types.find(t => t.id === typeId);
+    if (parentType) parentType.isCollapsed = false;
+
+    // Subtasks cannot have assigned dates
+    tasks.push({ id: newId, name: '', typeId, parentId, completed: false, assignedDate: null });
     saveData(); renderTasks();
-    setTimeout(() => document.querySelector(`input.task-input[data-id="${newId}"]`).focus(), 0);
+    restoreFocus(newId);
 }
 
 function renderTasks() {
@@ -242,10 +279,20 @@ function renderTasks() {
         const typeDiv = document.createElement('div');
         typeDiv.className = 'type-group';
         
+        const typeTasks = tasks.filter(t => t.typeId === type.id);
+        
+        // Progress Bar (counts all tasks & subtasks for accuracy)
+        const totalTasks = typeTasks.length;
+        const completedTasks = typeTasks.filter(t => t.completed).length;
+        const progressPercent = totalTasks === 0 ? 0 : (completedTasks / totalTasks) * 100;
+        
+        const isCollapsed = type.isCollapsed || false;
+
         const typeHeader = document.createElement('div');
         typeHeader.className = 'flex-row';
         typeHeader.innerHTML = `
             <span class="drag-handle">⋮⋮</span>
+            <span class="collapse-toggle ${isCollapsed ? 'collapsed' : ''}" data-id="${type.id}">▼</span>
             <div class="color-picker-container" title="Click to change color">
                 <input type="color" class="hidden-color-picker" value="${type.color}" data-id="${type.id}">
                 <div class="color-dot" style="background-color: ${type.color};"></div>
@@ -254,26 +301,51 @@ function renderTasks() {
         `;
         typeDiv.appendChild(typeHeader);
         
-        const typeTasks = tasks.filter(t => t.typeId === type.id);
+        const progressDiv = document.createElement('div');
+        progressDiv.className = 'progress-bar-container';
+        progressDiv.innerHTML = `<div class="progress-bar-fill" style="width: ${progressPercent}%; background-color: ${type.color};"></div>`;
+        typeDiv.appendChild(progressDiv);
+
         const taskListDiv = document.createElement('div');
-        taskListDiv.className = 'task-list';
+        taskListDiv.className = `task-list ${isCollapsed ? 'hidden' : ''}`;
         
-        typeTasks.forEach(task => {
+        // 1. Render Parent Tasks First
+        const parentTasks = typeTasks.filter(t => !t.parentId);
+        parentTasks.forEach(parentTask => {
             const taskEl = document.createElement('div');
-            taskEl.className = `task-item flex-row ${task.completed ? 'completed' : ''} ${task.assignedDate ? 'translucent' : ''}`;
+            taskEl.className = `task-item flex-row ${parentTask.completed ? 'completed' : ''} ${parentTask.assignedDate ? 'translucent' : ''}`;
             taskEl.draggable = true; 
             
             taskEl.addEventListener('dragstart', (e) => {
-                e.dataTransfer.setData('text/plain', task.id);
+                e.dataTransfer.setData('text/plain', parentTask.id);
                 e.dataTransfer.effectAllowed = 'move';
             });
 
             taskEl.innerHTML = `
                 <span class="drag-handle">⋮⋮</span>
-                <input type="checkbox" class="task-checkbox" ${task.completed ? 'checked' : ''} data-id="${task.id}">
-                <input type="text" class="inline-input task-input" value="${task.name}" placeholder="Task..." data-id="${task.id}">
+                <input type="checkbox" class="task-checkbox" ${parentTask.completed ? 'checked' : ''} data-id="${parentTask.id}">
+                <input type="text" class="inline-input task-input" value="${parentTask.name}" placeholder="Task (Press Tab for subtask)" data-id="${parentTask.id}">
             `;
             taskListDiv.appendChild(taskEl);
+
+            // 2. Render Subtasks directly under their Parent
+            const subtasks = typeTasks.filter(t => t.parentId === parentTask.id);
+            if (subtasks.length > 0) {
+                const subtaskContainer = document.createElement('div');
+                subtaskContainer.className = 'subtask-list';
+                
+                subtasks.forEach(subtask => {
+                    const subEl = document.createElement('div');
+                    subEl.className = `task-item subtask-item flex-row ${subtask.completed ? 'completed' : ''}`;
+                    subEl.innerHTML = `
+                        <span class="drag-handle">⋮⋮</span>
+                        <input type="checkbox" class="task-checkbox" ${subtask.completed ? 'checked' : ''} data-id="${subtask.id}">
+                        <input type="text" class="inline-input task-input" value="${subtask.name}" placeholder="Subtask..." data-id="${subtask.id}">
+                    `;
+                    subtaskContainer.appendChild(subEl);
+                });
+                taskListDiv.appendChild(subtaskContainer);
+            }
         });
         
         const addTaskBtn = document.createElement('div');
@@ -290,13 +362,24 @@ function renderTasks() {
 }
 
 function attachInlineListeners() {
+    document.querySelectorAll('.collapse-toggle').forEach(toggle => {
+        toggle.addEventListener('click', (e) => {
+            const type = types.find(t => t.id === e.target.dataset.id);
+            if (type) {
+                type.isCollapsed = !type.isCollapsed;
+                saveData();
+                renderTasks(); 
+            }
+        });
+    });
+
     document.querySelectorAll('.hidden-color-picker').forEach(picker => {
         picker.addEventListener('input', (e) => {
             const type = types.find(t => t.id === e.target.dataset.id);
             if (type) {
                 type.color = e.target.value;
                 e.target.nextElementSibling.style.backgroundColor = type.color;
-                saveData(); renderCalendar();
+                saveData(); renderCalendar(); renderTasks(); // Updates progress bar colors
             }
         });
     });
@@ -323,16 +406,48 @@ function attachInlineListeners() {
             const task = tasks.find(t => t.id === e.target.dataset.id);
             if (task) { task.name = e.target.value; saveData(); renderCalendar(); }
         });
+        
         input.addEventListener('keydown', (e) => {
+            const task = tasks.find(t => t.id === e.target.dataset.id);
+            if (!task) return;
+
+            // ENTER: Create new task (or subtask if currently on a subtask)
             if (e.key === 'Enter') {
                 e.preventDefault();
-                const task = tasks.find(t => t.id === e.target.dataset.id);
-                if (task) addNewTask(task.typeId); 
+                addNewTask(task.typeId, task.parentId); 
+            }
+
+            // TAB: Indent / Outdent Logic
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                
+                if (e.shiftKey) {
+                    // Outdent (Make subtask into a parent task)
+                    if (task.parentId) {
+                        task.parentId = null;
+                        saveData(); renderTasks(); restoreFocus(task.id);
+                    }
+                } else {
+                    // Indent (Make parent task into a subtask)
+                    if (!task.parentId) {
+                        // Find the task directly above it to become its parent
+                        const typeParentTasks = tasks.filter(t => t.typeId === task.typeId && !t.parentId);
+                        const currentIndex = typeParentTasks.findIndex(t => t.id === task.id);
+                        if (currentIndex > 0) {
+                            task.parentId = typeParentTasks[currentIndex - 1].id;
+                            task.assignedDate = null; // Remove subtasks from calendar
+                            saveData(); renderTasks(); renderCalendar(); restoreFocus(task.id);
+                        }
+                    }
+                }
             }
         });
+
         input.addEventListener('blur', (e) => {
             if (e.target.value.trim() === '') {
-                tasks = tasks.filter(t => t.id !== e.target.dataset.id);
+                const taskId = e.target.dataset.id;
+                // Delete task, and any subtasks attached to it
+                tasks = tasks.filter(t => t.id !== taskId && t.parentId !== taskId);
                 saveData(); renderTasks(); renderCalendar();
             }
         });
@@ -383,8 +498,7 @@ function renderCalendar() {
 
     for (let i = 0; i < firstDay; i++) {
         const emptyCell = document.createElement('div');
-        emptyCell.classList.add('day-cell');
-        emptyCell.style.background = '#f9f9f9';
+        emptyCell.classList.add('day-cell', 'empty-day');
         calendarGrid.appendChild(emptyCell);
     }
 
@@ -421,7 +535,8 @@ function renderCalendar() {
             const taskId = e.dataTransfer.getData('text/plain');
             const task = tasks.find(t => t.id === taskId);
             
-            if (task && task.assignedDate !== dateStr) {
+            // Only allow dropping Parent Tasks
+            if (task && task.assignedDate !== dateStr && !task.parentId) {
                 task.assignedDate = dateStr;
                 saveData(); 
                 renderTasks(); 
@@ -441,7 +556,8 @@ function renderCalendar() {
             });
         }
 
-        const dayTasks = tasks.filter(t => t.assignedDate === dateStr);
+        // Only render Parent Tasks in Calendar
+        const dayTasks = tasks.filter(t => t.assignedDate === dateStr && !t.parentId);
         dayTasks.forEach(task => {
             const type = types.find(t => t.id === task.typeId);
             const taskEl = document.createElement('div');
