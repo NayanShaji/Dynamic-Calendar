@@ -9,7 +9,7 @@ let viewStartDate = new Date();
 let currentSelectedMonth = viewStartDate.getMonth();
 let currentSelectedYear = viewStartDate.getFullYear();
 
-// DYNAMIC LAYOUT STATE
+// DYNAMIC LAYOUT STATE (This was missing!)
 let isMobileMode = false;
 let isMobilePortrait = false;
 
@@ -19,6 +19,27 @@ let targetEventId = null;
 
 const PRESET_COLORS = ['#e74c3c', '#e67e22', '#f1c40f', '#2ecc71', '#1abc9c', '#3498db', '#2980b9', '#9b59b6', '#8e44ad', '#fd79a8', '#f368e0', '#00cec9', '#badc58', '#d35400', '#2c3e50'];
 let activeColorTypeId = null;
+
+// --- FIREBASE AUTHENTICATION ---
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+
+// PASTE YOUR FIREBASE CONFIG HERE:
+const firebaseConfig = {
+  apiKey: "AIzaSyBDLQx_4ubu-4cfGKW_9-LEJ9CZ7FltNv0",
+  authDomain: "dynamic-cal.firebaseapp.com",
+  projectId: "dynamic-cal",
+  storageBucket: "dynamic-cal.firebasestorage.app",
+  messagingSenderId: "100721725657",
+  appId: "1:100721725657:web:249aa3e30d522a68252ec8"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const provider = new GoogleAuthProvider();
+
+let currentUserId = null; 
 
 // DOM Elements
 const taskListContainer = document.getElementById('task-list-container');
@@ -69,16 +90,39 @@ const colorGrid = document.getElementById('color-grid');
 const closeColorPickerBtn = document.getElementById('close-color-picker-btn');
 const hiddenCustomColorInput = document.getElementById('hidden-custom-color');
 
-// Initialize
-document.addEventListener('DOMContentLoaded', () => {
-    loadData();
-    checkLayoutMode(); 
-    initializeCalendarState();
-    renderTasks();
-    renderCalendar();
-    renderTodaysTasksWidget();
-    setupEventListeners();
-    checkStartupTasks();
+// --- MODULE INITIALIZATION ---
+// Modules automatically wait for HTML, so we just run this directly!
+checkLayoutMode(); 
+initializeCalendarState();
+setupEventListeners(); 
+
+const storedTheme = localStorage.getItem('plannerTheme');
+if (storedTheme === 'dark') {
+    document.body.classList.add('dark-mode');
+    document.getElementById('moon-icon').style.display = 'none';
+    document.getElementById('sun-icon').style.display = 'block';
+}
+
+// Listen for Login/Logout state changes
+onAuthStateChanged(auth, (user) => {
+    if (user) {
+        currentUserId = user.uid;
+        document.getElementById('login-screen').style.display = 'none';
+        console.log(`Success! Logged in as: ${user.displayName}`);
+        loadData(); // Fetch cloud data
+    } else {
+        currentUserId = null;
+        document.getElementById('login-screen').style.display = 'flex';
+        types = []; tasks = []; events = []; eventOnlyTypes = [];
+        renderTasks(); renderCalendar(); renderTodaysTasksWidget();
+    }
+});
+
+// Handle the Login Button Click
+document.getElementById('google-login-btn').addEventListener('click', () => {
+    signInWithPopup(auth, provider).catch((error) => {
+        console.error("Login failed:", error.message);
+    });
 });
 
 window.addEventListener('resize', checkLayoutMode);
@@ -87,10 +131,7 @@ window.addEventListener('resize', checkLayoutMode);
 function checkLayoutMode() {
     const H = window.innerHeight;
     const W = window.innerWidth;
-    
-    // UPDATED: Calculates the exact width where the 7x5 calendar cells become taller than they are wide
     const thresholdWidth = Math.floor((7 * (H - 100) / 5) + 380);
-    
     const newIsMobile = W < thresholdWidth || W <= 768; 
     const newIsPortrait = newIsMobile && (H > W);
     
@@ -110,7 +151,7 @@ function checkLayoutMode() {
         layoutChanged = true;
     }
     
-    if (layoutChanged) {
+    if (layoutChanged && currentUserId) {
         renderCalendar();
     }
 }
@@ -196,31 +237,56 @@ function applyColorToType(hexColor) {
     colorPickerModal.classList.add('hidden');
 }
 
-// --- Local Storage Functions ---
-function saveData() {
-    localStorage.setItem('plannerTypes', JSON.stringify(types));
-    localStorage.setItem('plannerTasks', JSON.stringify(tasks));
-    localStorage.setItem('plannerEvents', JSON.stringify(events));
-    localStorage.setItem('plannerEventOnlyTypes', JSON.stringify(eventOnlyTypes));
+// --- CLOUD DATABASE FUNCTIONS ---
+
+async function saveData() {
+    if (!auth.currentUser) return;
+    
+    const token = await auth.currentUser.getIdToken();
+    const data = { types, tasks, events, eventOnlyTypes };
+    
+    try {
+        await fetch('http://127.0.0.1:5000/api/data', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(data)
+        });
+    } catch (err) {
+        console.error("Failed to save to cloud:", err);
+    }
 }
 
-function loadData() {
-    const storedTypes = localStorage.getItem('plannerTypes');
-    const storedTasks = localStorage.getItem('plannerTasks');
-    const storedEvents = localStorage.getItem('plannerEvents');
-    const storedEventOnlyTypes = localStorage.getItem('plannerEventOnlyTypes');
-    const storedTheme = localStorage.getItem('plannerTheme');
-
-    if (storedTypes) types = JSON.parse(storedTypes);
-    if (storedTasks) tasks = JSON.parse(storedTasks);
-    if (storedEvents) events = JSON.parse(storedEvents);
-    if (storedEventOnlyTypes) eventOnlyTypes = JSON.parse(storedEventOnlyTypes);
-
-    if (storedTheme === 'dark') {
-        document.body.classList.add('dark-mode');
-        document.getElementById('moon-icon').style.display = 'none';
-        document.getElementById('sun-icon').style.display = 'block';
+async function loadData() {
+    if (!auth.currentUser) return;
+    
+    const token = await auth.currentUser.getIdToken();
+    
+    try {
+        const response = await fetch('http://127.0.0.1:5000/api/data', {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            types = data.types || [];
+            tasks = data.tasks || [];
+            events = data.events || [];
+            eventOnlyTypes = data.eventOnlyTypes || [];
+        }
+    } catch (err) {
+        console.error("Failed to load from cloud:", err);
     }
+
+    renderTasks();
+    renderCalendar();
+    renderTodaysTasksWidget();
+    checkStartupTasks();
 }
 
 // --- Continuous Calendar Setup ---
@@ -340,6 +406,14 @@ function renderTodaysTasksWidget() {
 // --- App Logic & Listeners ---
 function setupEventListeners() {
     
+    document.getElementById('logout-btn').addEventListener('click', () => {
+        signOut(auth).then(() => {
+            console.log("User signed out successfully.");
+        }).catch((error) => {
+            console.error("Logout failed:", error);
+        });
+    });
+
     addDeadlineBtn.addEventListener('click', () => {
         deadlineDaySel.innerHTML = '';
         for(let i=1; i<=31; i++) deadlineDaySel.innerHTML += `<option value="${i}">${i}</option>`;
@@ -1154,7 +1228,6 @@ function renderCalendar() {
     calendarGrid.innerHTML = '';
     const todayStr = getTodayStr();
     
-    // UPDATED: Uses 35 (5 rows) instead of 42 (6 rows) for Desktop
     const daysToRender = isMobilePortrait ? 14 : 35;
 
     for (let i = 0; i < daysToRender; i++) {
