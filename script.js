@@ -246,7 +246,7 @@ async function saveData() {
     const data = { types, tasks, events, eventOnlyTypes };
     
     try {
-        await fetch('http://127.0.0.1:5000/api/data', {
+        await fetch('https://dynamic-planner-api-language-python-3.onrender.com/api/data', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -265,7 +265,7 @@ async function loadData() {
     const token = await auth.currentUser.getIdToken();
     
     try {
-        const response = await fetch('http://127.0.0.1:5000/api/data', {
+        const response = await fetch('https://dynamic-planner-api-language-python-3.onrender.com/api/data', {
             method: 'GET',
             headers: {
                 'Authorization': `Bearer ${token}`
