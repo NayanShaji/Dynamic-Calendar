@@ -49,29 +49,40 @@
 
     <main id="calendar-view">
         <header class="calendar-header">
-            <button id="mobile-menu-btn" class="icon-btn" style="display: none; background-color: #2c3e50; color: white; width: 40px; height: 40px; transition: opacity 0.2s, transform 0.2s;">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
-            </button>
-            
-            <button id="prev-week" class="icon-btn" style="width: auto; padding: 0 15px;">▲ <span class="nav-text">Up</span></button>
-            <div class="calendar-dropdowns">
-                <select id="month-select" class="header-select">
-                    <option value="0">January</option>
-                    <option value="1">February</option>
-                    <option value="2">March</option>
-                    <option value="3">April</option>
-                    <option value="4">May</option>
-                    <option value="5">June</option>
-                    <option value="6">July</option>
-                    <option value="7">August</option>
-                    <option value="8">September</option>
-                    <option value="9">October</option>
-                    <option value="10">November</option>
-                    <option value="11">December</option>
-                </select>
-                <select id="year-select" class="header-select"></select>
+            <div class="header-left">
+                <button id="mobile-menu-btn" class="icon-btn" style="display: none; background-color: #2c3e50; color: white; width: 40px; height: 40px; transition: opacity 0.2s, transform 0.2s;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                </button>
+                
+                <button id="add-deadline-btn" class="icon-btn deadline-btn">
+                    <span class="nav-icon" style="display:none;">+ 🚩</span>
+                    <span class="nav-text">+ Deadline</span>
+                </button>
             </div>
-            <button id="next-week" class="icon-btn" style="width: auto; padding: 0 15px;">▼ <span class="nav-text">Down</span></button>
+
+            <div class="header-controls">
+                <div class="calendar-dropdowns">
+                    <select id="month-select" class="header-select">
+                        <option value="0">January</option>
+                        <option value="1">February</option>
+                        <option value="2">March</option>
+                        <option value="3">April</option>
+                        <option value="4">May</option>
+                        <option value="5">June</option>
+                        <option value="6">July</option>
+                        <option value="7">August</option>
+                        <option value="8">September</option>
+                        <option value="9">October</option>
+                        <option value="10">November</option>
+                        <option value="11">December</option>
+                    </select>
+                    <select id="year-select" class="header-select"></select>
+                </div>
+                <div class="nav-buttons">
+                    <button id="prev-week" class="icon-btn nav-btn">▲ <span class="nav-text">Up</span></button>
+                    <button id="next-week" class="icon-btn nav-btn">▼ <span class="nav-text">Down</span></button>
+                </div>
+            </div>
         </header>
         
         <div class="calendar-wrapper">
@@ -89,6 +100,34 @@
                 </div>
         </div>
     </main>
+
+    <div id="deadline-modal" class="modal hidden">
+        <div class="modal-content">
+            <h3>Add Deadline</h3>
+            <input type="text" id="deadline-name" placeholder="Deadline Name (e.g. Final Report)">
+            
+            <div class="modal-form-group">
+                <label>Due Date:</label>
+                <div style="display: flex; gap: 5px;">
+                    <select id="deadline-day" class="header-select" style="flex: 1; padding: 8px;"></select>
+                    <select id="deadline-month" class="header-select" style="flex: 1; padding: 8px;"></select>
+                    <select id="deadline-year" class="header-select" style="flex: 1; padding: 8px;"></select>
+                </div>
+            </div>
+
+            <div class="modal-form-group">
+                <label for="deadline-type-select">Subject/Category:</label>
+                <select id="deadline-type-select" class="header-select" style="width: 100%; padding: 10px;"></select>
+            </div>
+            
+            <div class="modal-actions" style="margin-top: 20px;">
+                <div></div> <div class="action-right">
+                    <button id="cancel-deadline-btn" class="secondary-btn">Cancel</button>
+                    <button id="save-deadline-btn" style="background: #e74c3c; color: white; border: none; padding: 8px 15px; border-radius: 4px; font-weight: bold;">Save</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div id="event-modal" class="modal hidden">
         <div class="modal-content">

@@ -8,7 +8,10 @@ let eventOnlyTypes = [];
 let viewStartDate = new Date();
 let currentSelectedMonth = viewStartDate.getMonth();
 let currentSelectedYear = viewStartDate.getFullYear();
-let isMobilePortrait = window.innerWidth <= 768 && window.innerHeight > window.innerWidth;
+
+// DYNAMIC LAYOUT STATE
+let isMobileMode = false;
+let isMobilePortrait = false;
 
 // Modal State Variables
 let targetEventDate = null; 
@@ -39,6 +42,16 @@ const eventColorInput = document.getElementById('event-color');
 const modalTitle = document.getElementById('modal-title');
 const deleteEventBtn = document.getElementById('delete-event-btn');
 
+const deadlineModal = document.getElementById('deadline-modal');
+const addDeadlineBtn = document.getElementById('add-deadline-btn');
+const cancelDeadlineBtn = document.getElementById('cancel-deadline-btn');
+const saveDeadlineBtn = document.getElementById('save-deadline-btn');
+const deadlineDaySel = document.getElementById('deadline-day');
+const deadlineMonthSel = document.getElementById('deadline-month');
+const deadlineYearSel = document.getElementById('deadline-year');
+const deadlineTypeSel = document.getElementById('deadline-type-select');
+const deadlineNameInput = document.getElementById('deadline-name');
+
 const dayViewModal = document.getElementById('day-view-modal');
 const closeDayViewBtn = document.getElementById('close-day-view-btn');
 const dayViewTitle = document.getElementById('day-view-title');
@@ -59,22 +72,48 @@ const hiddenCustomColorInput = document.getElementById('hidden-custom-color');
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
     loadData();
+    checkLayoutMode(); 
     initializeCalendarState();
     renderTasks();
     renderCalendar();
     renderTodaysTasksWidget();
     setupEventListeners();
-    
     checkStartupTasks();
 });
 
-window.addEventListener('resize', () => {
-    const newIsMobilePortrait = window.innerWidth <= 768 && window.innerHeight > window.innerWidth;
-    if (newIsMobilePortrait !== isMobilePortrait) {
-        isMobilePortrait = newIsMobilePortrait;
+window.addEventListener('resize', checkLayoutMode);
+
+// --- DYNAMIC GEOMETRY MATH ---
+function checkLayoutMode() {
+    const H = window.innerHeight;
+    const W = window.innerWidth;
+    
+    // UPDATED: Calculates the exact width where the 7x5 calendar cells become taller than they are wide
+    const thresholdWidth = Math.floor((7 * (H - 100) / 5) + 380);
+    
+    const newIsMobile = W < thresholdWidth || W <= 768; 
+    const newIsPortrait = newIsMobile && (H > W);
+    
+    let layoutChanged = false;
+    
+    if (newIsMobile !== isMobileMode) {
+        isMobileMode = newIsMobile;
+        if (isMobileMode) document.body.classList.add('mobile-mode');
+        else document.body.classList.remove('mobile-mode');
+        layoutChanged = true;
+    }
+    
+    if (newIsPortrait !== isMobilePortrait) {
+        isMobilePortrait = newIsPortrait;
+        if (isMobilePortrait) document.body.classList.add('mobile-portrait');
+        else document.body.classList.remove('mobile-portrait');
+        layoutChanged = true;
+    }
+    
+    if (layoutChanged) {
         renderCalendar();
     }
-});
+}
 
 // --- Utility Functions ---
 function getTodayStr() {
@@ -91,7 +130,6 @@ function getTranslucentColor(hex, opacity = 0.5) {
     return `rgba(${r}, ${g}, ${b}, ${opacity})`;
 }
 
-// RESTORED: Opacity check for Dark Mode (set to 0.5 instead of 0.3)
 function getModeColor(hex) {
     if (!hex) hex = '#ccc';
     const isDark = document.body.classList.contains('dark-mode');
@@ -230,7 +268,7 @@ function checkStartupTasks() {
             taskEl.className = 'widget-task';
             taskEl.innerHTML = `
                 <span class="color-dot" style="background-color: ${getModeColor(type ? type.color : '#ccc')};"></span>
-                <span class="task-text">${task.name}</span> 
+                <span class="task-text">${task.isDeadline ? '🚩 ' : ''}${task.name}</span> 
                 <span style="font-size: 0.7rem; color: #888; margin-left: auto;">(${task.assignedDate})</span>
             `;
             overdueTasksList.appendChild(taskEl);
@@ -244,11 +282,14 @@ function checkStartupTasks() {
 function renderTodaysTasksWidget() {
     todaysTasksList.innerHTML = '';
     const todayStr = getTodayStr();
+    const todayObj = new Date(todayStr);
     
-    const visibleTasks = tasks.filter(t => 
-        !t.parentId && t.assignedDate && 
-        (t.assignedDate === todayStr || (t.assignedDate < todayStr && !t.completed))
-    );
+    const visibleTasks = tasks.filter(t => {
+        if (t.parentId) return false;
+        if (t.isDeadline && !t.completed) return true; 
+        if (t.assignedDate === todayStr || (t.assignedDate < todayStr && !t.completed)) return true;
+        return false;
+    });
 
     visibleTasks.sort((a, b) => a.assignedDate.localeCompare(b.assignedDate));
     
@@ -260,14 +301,24 @@ function renderTodaysTasksWidget() {
     visibleTasks.forEach(task => {
         const type = types.find(t => t.id === task.typeId);
         const isOverdue = task.assignedDate < todayStr && !task.completed;
+        
+        let daysText = '';
+        if (task.isDeadline && task.assignedDate && !task.completed) {
+            const dlObj = new Date(task.assignedDate);
+            const diffDays = Math.ceil((dlObj - todayObj) / (1000 * 60 * 60 * 24));
+            if (diffDays > 0) daysText = `(${diffDays} days remaining)`;
+            else if (diffDays === 0) daysText = `(Due Today)`;
+            else daysText = `(${Math.abs(diffDays)} days overdue)`;
+        }
+
         const taskEl = document.createElement('div');
         taskEl.className = `widget-task ${task.completed ? 'completed' : ''}`;
         
         taskEl.innerHTML = `
             <span class="color-dot" style="background-color: ${getModeColor(type ? type.color : '#ccc')};"></span>
             <input type="checkbox" ${task.completed ? 'checked' : ''} data-id="${task.id}">
-            <span class="task-text">${task.name}</span>
-            ${isOverdue ? '<span class="overdue-badge">Overdue</span>' : ''}
+            <span class="task-text">${task.isDeadline ? '🚩 ' : ''}${task.name} <span class="deadline-info">${daysText}</span></span>
+            ${isOverdue && !task.isDeadline ? '<span class="overdue-badge">Overdue</span>' : ''}
         `;
 
         taskEl.querySelector('input').addEventListener('change', (e) => {
@@ -289,6 +340,67 @@ function renderTodaysTasksWidget() {
 // --- App Logic & Listeners ---
 function setupEventListeners() {
     
+    addDeadlineBtn.addEventListener('click', () => {
+        deadlineDaySel.innerHTML = '';
+        for(let i=1; i<=31; i++) deadlineDaySel.innerHTML += `<option value="${i}">${i}</option>`;
+
+        deadlineMonthSel.innerHTML = '';
+        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        months.forEach((m, i) => deadlineMonthSel.innerHTML += `<option value="${i}">${m}</option>`);
+
+        deadlineYearSel.innerHTML = '';
+        const currYear = new Date().getFullYear();
+        for(let i=currYear-2; i<=currYear+5; i++) deadlineYearSel.innerHTML += `<option value="${i}">${i}</option>`;
+
+        const today = new Date();
+        deadlineDaySel.value = today.getDate();
+        deadlineMonthSel.value = today.getMonth();
+        deadlineYearSel.value = today.getFullYear();
+
+        deadlineTypeSel.innerHTML = '';
+        types.forEach(t => { deadlineTypeSel.innerHTML += `<option value="${t.id}">${t.name}</option>`; });
+        if(types.length === 0) deadlineTypeSel.innerHTML = `<option value="">Create a category first!</option>`;
+
+        deadlineNameInput.value = '';
+        deadlineModal.classList.remove('hidden');
+    });
+
+    cancelDeadlineBtn.addEventListener('click', () => {
+        deadlineModal.classList.add('hidden');
+    });
+
+    saveDeadlineBtn.addEventListener('click', () => {
+        const name = deadlineNameInput.value.trim();
+        const typeId = deadlineTypeSel.value;
+        
+        if (!name || !typeId) {
+            alert("Please enter a name and ensure a category is selected.");
+            return;
+        }
+
+        const d = deadlineDaySel.value;
+        const m = deadlineMonthSel.value;
+        const y = deadlineYearSel.value;
+        const dateStr = `${y}-${String(parseInt(m)+1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+
+        const newId = Date.now().toString();
+        tasks.push({
+            id: newId,
+            name: name,
+            typeId: typeId,
+            parentId: null,
+            completed: false,
+            assignedDate: dateStr,
+            isDeadline: true
+        });
+
+        saveData();
+        renderTasks();
+        renderCalendar();
+        renderTodaysTasksWidget();
+        deadlineModal.classList.add('hidden');
+    });
+
     hiddenCustomColorInput.addEventListener('input', (e) => {
         applyColorToType(e.target.value);
     });
@@ -381,7 +493,6 @@ function setupEventListeners() {
             localStorage.setItem('plannerTheme', 'light');
         }
 
-        // Live refresh to catch the opacity changes instantly
         renderTasks();
         renderCalendar();
         renderTodaysTasksWidget();
@@ -635,7 +746,7 @@ function setupEventListeners() {
 
             if (navigator.vibrate) navigator.vibrate(50);
 
-            if (window.innerWidth <= 768) {
+            if (isMobileMode) {
                 if (sidebar) sidebar.classList.remove('open');
                 if (mobileOverlay) mobileOverlay.classList.remove('active');
             }
@@ -759,7 +870,7 @@ function addNewTask(typeId, parentId = null) {
     const parentType = types.find(t => t.id === typeId);
     if (parentType) parentType.isCollapsed = false;
 
-    tasks.push({ id: newId, name: '', typeId, parentId, completed: false, assignedDate: null });
+    tasks.push({ id: newId, name: '', typeId, parentId, completed: false, assignedDate: null, isDeadline: false });
     saveData(); renderTasks();
     restoreFocus(newId);
 }
@@ -810,7 +921,7 @@ function renderTasks() {
                 e.dataTransfer.setData('text/plain', parentTask.id);
                 e.dataTransfer.effectAllowed = 'move';
                 
-                if (window.innerWidth <= 768) {
+                if (isMobileMode) {
                     setTimeout(() => {
                         if (sidebar) sidebar.classList.remove('open');
                         if (mobileOverlay) mobileOverlay.classList.remove('active');
@@ -821,6 +932,7 @@ function renderTasks() {
             taskEl.innerHTML = `
                 <span class="drag-handle">⋮⋮</span>
                 <input type="checkbox" class="task-checkbox" ${parentTask.completed ? 'checked' : ''} data-id="${parentTask.id}">
+                ${parentTask.isDeadline ? '<span title="Deadline" style="font-size:0.8rem; margin-right:4px;">🚩</span>' : ''}
                 <input type="text" class="inline-input task-input" value="${parentTask.name}" placeholder="Task (Press Tab for subtask)" data-id="${parentTask.id}">
                 <button class="delete-task-btn" data-id="${parentTask.id}" title="Delete Task">&times;</button>
             `;
@@ -998,7 +1110,7 @@ function openDayViewModal(dateStr) {
             taskEl.innerHTML = `
                 <span class="color-dot" style="background-color: ${getModeColor(type ? type.color : '#ccc')}; width: 10px; height: 10px; display: inline-block; border-radius: 50%;"></span>
                 <input type="checkbox" ${task.completed ? 'checked' : ''} data-id="${task.id}">
-                <span>${task.name}</span>
+                <span>${task.isDeadline ? '🚩 ' : ''}${task.name}</span>
             `;
 
             taskEl.querySelector('input').addEventListener('change', (e) => {
@@ -1042,7 +1154,8 @@ function renderCalendar() {
     calendarGrid.innerHTML = '';
     const todayStr = getTodayStr();
     
-    const daysToRender = isMobilePortrait ? 14 : 42;
+    // UPDATED: Uses 35 (5 rows) instead of 42 (6 rows) for Desktop
+    const daysToRender = isMobilePortrait ? 14 : 35;
 
     for (let i = 0; i < daysToRender; i++) {
         const loopDate = new Date(viewStartDate);
@@ -1062,6 +1175,11 @@ function renderCalendar() {
 
         if (loopMonth !== currentSelectedMonth) {
             cell.classList.add('dimmed-day');
+        }
+
+        const dayDeadlines = tasks.filter(t => t.assignedDate === dateStr && !t.parentId && t.isDeadline && !t.completed);
+        if (dayDeadlines.length > 0) {
+            cell.classList.add('deadline-day');
         }
 
         cell.dataset.date = dateStr;
@@ -1112,8 +1230,8 @@ function renderCalendar() {
         });
 
         const dayEvents = events.filter(e => e.date === dateStr);
-        const dayTasks = tasks.filter(t => t.assignedDate === dateStr && !t.parentId);
-        const totalItems = dayEvents.length + dayTasks.length;
+        const dayTasks = tasks.filter(t => t.assignedDate === dateStr && !t.parentId && !t.isDeadline);
+        const totalItems = dayEvents.length + dayDeadlines.length + dayTasks.length;
         let renderedCount = 0; 
 
         if (dayEvents.length > 0) {
@@ -1127,10 +1245,8 @@ function renderCalendar() {
                 dayColor = firstEvt.color; 
             }
 
-            // RESTORED: Applies the 0.5 opacity only when Dark Mode is active
             cell.style.backgroundColor = getModeColor(dayColor);
             
-            // Apply text formatting to ensure solid background readability
             const isDark = document.body.classList.contains('dark-mode');
             if (!isDark) {
                 const dayNum = cell.querySelector('.day-number');
@@ -1155,6 +1271,45 @@ function renderCalendar() {
                 }
             });
         }
+
+        dayDeadlines.forEach(task => {
+            if (renderedCount < 2) {
+                const type = types.find(t => t.id === task.typeId);
+                const taskEl = document.createElement('div');
+                taskEl.className = `calendar-event ${task.completed ? 'completed' : ''}`;
+                
+                taskEl.style.backgroundColor = getModeColor(type ? type.color : '#e74c3c');
+                taskEl.style.display = 'flex';
+                taskEl.style.alignItems = 'center';
+                
+                const isDark = document.body.classList.contains('dark-mode');
+                if (!isDark) {
+                    taskEl.style.color = '#fff';
+                    taskEl.style.textShadow = '0 1px 3px rgba(0,0,0,0.7)';
+                }
+
+                taskEl.draggable = true;
+                taskEl.dataset.taskId = task.id; 
+                
+                taskEl.addEventListener('dragstart', (e) => {
+                    e.dataTransfer.setData('text/plain', task.id);
+                    e.dataTransfer.effectAllowed = 'move';
+                });
+
+                taskEl.innerHTML = `
+                    <input type="checkbox" ${task.completed ? 'checked' : ''} style="margin-right: 5px; flex-shrink: 0;">
+                    <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">🚩 ${task.name}</span>
+                `;
+
+                taskEl.querySelector('input').addEventListener('change', (e) => {
+                    task.completed = e.target.checked;
+                    saveData(); renderTasks(); renderCalendar(); renderTodaysTasksWidget();
+                });
+
+                dayContent.appendChild(taskEl);
+                renderedCount++;
+            }
+        });
 
         dayTasks.forEach(task => {
             if (renderedCount < 2) {
